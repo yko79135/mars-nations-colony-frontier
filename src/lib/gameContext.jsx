@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel } from './gameData';
+import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel, isExploredByNation, canExploreHex, canClaimHex } from './gameData';
 import { JUNIOR_TECHS } from './gameModes';
 
 const GameContext = createContext();
@@ -113,49 +113,12 @@ export function GameProvider({ children }) {
   const exploreHex = useCallback((hexKey) => {
     setGameState(prev => {
       if (!prev || prev.actionPoints <= 0) return prev;
+      // Use shared validator for consistency with HexMap highlights
+      if (!canExploreHex(prev, prev.currentPlayerIndex, hexKey)) return prev;
+
       const next = JSON.parse(JSON.stringify(prev));
       const hex = next.map.hexes[hexKey];
-      if (!hex) return prev;
-
       const pidx = next.currentPlayerIndex;
-      const player = next.players[pidx];
-
-      // Already explored by this nation?
-      if (hex.exploredBy?.[pidx]) return prev;
-      // Legacy global explored check for starting hexes
-      if (!hex.exploredBy && hex.explored && hex.owner === pidx) return prev;
-
-      const hasLongRange = player.technologies.includes('longRangeRovers') || player.technologies.includes('longRangeRover');
-
-      // Helper: is a hex explored by this nation?
-      const exploredByMe = (h) => {
-        if (!h) return false;
-        if (h.exploredBy) return !!h.exploredBy[pidx];
-        return !!h.explored; // legacy starting hex
-      };
-
-      // EXPLORE RULE: target must be adjacent to any hex already explored by this nation.
-      // Ownership is NOT required.
-      const neighbors = getHexNeighbors(hex.q, hex.r);
-      let isReachable = neighbors.some(n => {
-        const nk = `${n.q},${n.r}`;
-        return exploredByMe(next.map.hexes[nk]);
-      });
-
-      // Long-range rover: within distance 2 of any explored-by-me hex
-      if (!isReachable && hasLongRange) {
-        isReachable = Object.values(next.map.hexes).some(h => {
-          if (!exploredByMe(h)) return false;
-          const dist = Math.max(
-            Math.abs(h.q - hex.q),
-            Math.abs(h.r - hex.r),
-            Math.abs((-h.q - h.r) - (-hex.q - hex.r))
-          );
-          return dist <= 2;
-        });
-      }
-
-      if (!isReachable) return prev;
 
       // Mark this hex as explored by this nation (per-nation tracking)
       if (!hex.exploredBy) hex.exploredBy = {};
@@ -171,20 +134,13 @@ export function GameProvider({ children }) {
   const claimHex = useCallback((hexKey) => {
     setGameState(prev => {
       if (!prev || prev.actionPoints <= 0) return prev;
+      // Use shared validator for consistency with HexMap highlights
+      if (!canClaimHex(prev, prev.currentPlayerIndex, hexKey)) return prev;
+
       const next = JSON.parse(JSON.stringify(prev));
       const pidx = next.currentPlayerIndex;
       const player = next.players[pidx];
       const hex = next.map.hexes[hexKey];
-      // Must be explored by this nation and unclaimed
-      const exploredByMe = hex?.exploredBy ? !!hex.exploredBy[pidx] : !!hex?.explored;
-      if (!hex || !exploredByMe || hex.owner !== null) return prev;
-
-      const neighbors = getHexNeighbors(hex.q, hex.r);
-      const hasAdj = neighbors.some(n => {
-        const nk = `${n.q},${n.r}`;
-        return next.map.hexes[nk] && next.map.hexes[nk].owner === pidx;
-      });
-      if (!hasAdj) return prev;
 
       const claimCost = player.technologies.includes('pressurizedRoads') ? { energy: 0, minerals: 1 } : { energy: 1, minerals: 2 };
       for (const [res, amt] of Object.entries(claimCost)) {

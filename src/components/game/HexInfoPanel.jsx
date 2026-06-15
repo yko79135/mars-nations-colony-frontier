@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
-import { TERRAIN_TYPES, BUILDINGS } from '@/lib/gameData';
+import { TERRAIN_TYPES, BUILDINGS, isExploredByNation, canExploreHex, canClaimHex } from '@/lib/gameData';
 import { X, MapPin } from 'lucide-react';
 
 const TERRAIN_ICONS = {
@@ -31,8 +31,10 @@ export default function HexInfoPanel({ hexKey, onClose, actionMode }) {
   const ownerPlayer = hex.owner !== null && hex.owner !== undefined ? gameState.players[hex.owner] : null;
   const terrainData = TERRAIN_TYPES[hex.terrain];
   const isOwned = hex.owner === pidx;
-  // Per-nation explored check
-  const exploredByMe = hex.exploredBy ? !!hex.exploredBy[pidx] : !!hex.explored;
+  // Per-nation explored check using shared helper
+  const exploredByMe = isExploredByNation(hex, pidx);
+  // Capital hexes are always visible even if not explored
+  const isVisible = exploredByMe || hex.isCapital;
 
   const buildableBuildings = isOwned && actionMode === 'build'
     ? Object.entries(BUILDINGS).filter(([id, b]) => {
@@ -60,7 +62,7 @@ export default function HexInfoPanel({ hexKey, onClose, actionMode }) {
         <button onClick={onClose} className="text-gray-600 hover:text-white transition-colors"><X size={15} /></button>
       </div>
 
-      {exploredByMe ? (
+      {isVisible ? (
         <div className="flex-1 p-4 space-y-4">
           {/* Terrain */}
           <div className="rounded-xl px-3 py-3 flex items-center gap-3"
@@ -147,14 +149,14 @@ export default function HexInfoPanel({ hexKey, onClose, actionMode }) {
 
           {/* Actions */}
           <div className="space-y-2 pt-1">
-            {actionMode === 'explore' && !exploredByMe && (
+            {actionMode === 'explore' && canExploreHex(gameState, pidx, hexKey) && (
               <button onClick={() => exploreHex(hexKey)} disabled={gameState.actionPoints <= 0}
                 className="w-full py-2.5 rounded-xl text-xs font-heading font-bold transition-all disabled:opacity-40"
                 style={{ background: 'rgba(96,165,250,0.2)', border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd' }}>
                 🔭 {t.actions.explore}
               </button>
             )}
-            {actionMode === 'claim' && exploredByMe && hex.owner === null && (
+            {actionMode === 'claim' && canClaimHex(gameState, pidx, hexKey) && (
               <button onClick={() => claimHex(hexKey)} disabled={gameState.actionPoints <= 0}
                 className="w-full py-2.5 rounded-xl text-xs font-heading font-bold transition-all disabled:opacity-40"
                 style={{ background: 'rgba(74,222,128,0.2)', border: '1px solid rgba(74,222,128,0.4)', color: '#86efac' }}>
@@ -180,11 +182,24 @@ export default function HexInfoPanel({ hexKey, onClose, actionMode }) {
             )}
           </div>
         </div>
+      ) : hex.isCapital && ownerPlayer ? (
+        // Foreign capital — visible but not explored
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+            style={{ background: ownerPlayer.colorHex + '22', border: `2px solid ${ownerPlayer.colorHex}` }}>
+            {ownerPlayer.emblem}
+          </div>
+          <p className="text-sm font-heading font-bold" style={{ color: ownerPlayer.colorHex }}>{ownerPlayer.countryName}</p>
+          <p className="text-gray-500 text-xs">{ownerPlayer.colonyName}</p>
+          <p className="text-gray-600 text-[11px]">
+            {lang === 'ko' ? '다른 국가의 수도입니다.' : 'Capital of another nation.'}
+          </p>
+        </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
           <span className="text-5xl opacity-30">?</span>
           <p className="text-gray-500 text-sm">{t.terrain.unexplored}</p>
-          {actionMode === 'explore' && !exploredByMe && (
+          {actionMode === 'explore' && canExploreHex(gameState, pidx, hexKey) && (
             <button onClick={() => exploreHex(hexKey)} disabled={gameState.actionPoints <= 0}
               className="px-5 py-2.5 rounded-xl text-xs font-heading font-bold transition-all disabled:opacity-40"
               style={{ background: 'rgba(96,165,250,0.2)', border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd' }}>

@@ -8,51 +8,26 @@ import ResearchPanel from './ResearchPanel';
 import CooperationPanel from './CooperationPanel';
 import JuniorMapLegend from './JuniorMapLegend';
 import BuildingGuideModal, { BuildSelectionCards, HexTooltip, JUNIOR_BUILDING_GUIDE, RES_ICON } from './JuniorBuildGuide';
-import { getHexNeighbors } from '@/lib/gameData';
+import { canExploreHex, canClaimHex, canBuildOnHex, isExploredByNation } from '@/lib/gameData';
 import { Save, Search, MapPin, Hammer, FlaskConical, Heart, SkipForward, X, HelpCircle, BookOpen } from 'lucide-react';
 
-// Helper: is a hex explored by a given nation index?
-function exploredByNation(hex, nationIndex) {
-  if (!hex) return false;
-  if (hex.exploredBy) return !!hex.exploredBy[nationIndex];
-  return !!hex.explored; // legacy
-}
-
+// Pre-check: are there any valid targets for this action in the current game state?
 function checkValidTargets(actionMode, gameState) {
   if (!gameState || !actionMode) return { hasTargets: false, reason: '' };
-  const { map, players, currentPlayerIndex } = gameState;
-  const player = players[currentPlayerIndex];
-  const hasLongRange = player.technologies.includes('longRangeRover') || player.technologies.includes('longRangeRovers');
+  const { map, currentPlayerIndex } = gameState;
   const pidx = currentPlayerIndex;
 
   if (actionMode === 'explore') {
-    const hasTargets = Object.values(map.hexes).some(hex => {
-      if (exploredByNation(hex, pidx)) return false;
-      const adjExplored = getHexNeighbors(hex.q, hex.r).some(n => {
-        const nk = `${n.q},${n.r}`;
-        return exploredByNation(map.hexes[nk], pidx);
-      });
-      if (adjExplored) return true;
-      if (hasLongRange) {
-        return Object.values(map.hexes).some(h => {
-          if (!exploredByNation(h, pidx)) return false;
-          return Math.max(Math.abs(h.q - hex.q), Math.abs(h.r - hex.r), Math.abs((-h.q - h.r) - (-hex.q - hex.r))) <= 2;
-        });
-      }
-      return false;
-    });
-    return { hasTargets, reason: 'noValidExplore' };
+    const hasTargets = Object.keys(map.hexes).some(key => canExploreHex(gameState, pidx, key));
+    return { hasTargets, reason: hasTargets ? '' : 'noValidExplore' };
   }
   if (actionMode === 'claim') {
-    const hasTargets = Object.values(map.hexes).some(hex => {
-      if (!exploredByNation(hex, pidx) || hex.owner !== null) return false;
-      return getHexNeighbors(hex.q, hex.r).some(n => { const nk = `${n.q},${n.r}`; return map.hexes[nk]?.owner === pidx; });
-    });
-    return { hasTargets, reason: 'noValidClaim' };
+    const hasTargets = Object.keys(map.hexes).some(key => canClaimHex(gameState, pidx, key));
+    return { hasTargets, reason: hasTargets ? '' : 'noValidClaim' };
   }
   if (actionMode === 'build') {
-    const hasTargets = Object.values(map.hexes).some(hex => hex.owner === currentPlayerIndex);
-    return { hasTargets, reason: 'noValidBuild' };
+    const hasTargets = Object.keys(map.hexes).some(key => canBuildOnHex(gameState, pidx, key));
+    return { hasTargets, reason: hasTargets ? '' : 'noValidBuild' };
   }
   return { hasTargets: true, reason: '' };
 }
@@ -90,23 +65,56 @@ export default function JuniorGameScreen() {
   };
 
   const handleHexSelect = (hexKey) => {
-    setSelectedHex(hexKey);
     const hex = gameState.map.hexes[hexKey];
     if (!hex) return;
 
     const pidx = gameState.currentPlayerIndex;
-    const hexExploredByMe = hex.exploredBy ? !!hex.exploredBy[pidx] : !!hex.explored;
 
-    if (actionMode === 'explore' && !hexExploredByMe) {
-      exploreHex(hexKey);
-      setActionMode(null);
-      setSelectedHex(null);
-    } else if (actionMode === 'claim' && hexExploredByMe && hex.owner === null) {
-      claimHex(hexKey);
-      setActionMode(null);
-      setSelectedHex(null);
-    } else if (actionMode === 'build' && hex.owner === gameState.currentPlayerIndex) {
-      setBuildMenu(hexKey);
+    // No action active — just select the hex for info
+    if (!actionMode) {
+      setSelectedHex(hexKey);
+      return;
+    }
+
+    // Action active — validate and execute or show feedback
+    if (actionMode === 'explore') {
+      if (canExploreHex(gameState, pidx, hexKey)) {
+        exploreHex(hexKey);
+        setActionMode(null);
+        setSelectedHex(null);
+      } else {
+        const exploredByMe = isExploredByNation(hex, pidx);
+        const msg = exploredByMe
+          ? (lang === 'ko' ? '이미 탐사한 타일입니다.' : 'Already explored by your nation.')
+          : (lang === 'ko' ? '자신의 탐사 지역에 인접한 타일만 탐사할 수 있습니다.' : 'You can explore only next to your own explored region.');
+        setActionMsg(msg);
+        setSelectedHex(hexKey);
+      }
+    } else if (actionMode === 'claim') {
+      if (canClaimHex(gameState, pidx, hexKey)) {
+        claimHex(hexKey);
+        setActionMode(null);
+        setSelectedHex(null);
+      } else {
+        const exploredByMe = isExploredByNation(hex, pidx);
+        const msg = !exploredByMe
+          ? (lang === 'ko' ? '먼저 탐사해야 합니다.' : 'Must explore this tile first.')
+          : hex.owner !== null
+            ? (lang === 'ko' ? '이미 다른 국가의 영토입니다.' : 'Already owned by another nation.')
+            : (lang === 'ko' ? '현재 영토와 연결되어 있지 않습니다.' : 'This tile is not connected to your territory.');
+        setActionMsg(msg);
+        setSelectedHex(hexKey);
+      }
+    } else if (actionMode === 'build') {
+      if (canBuildOnHex(gameState, pidx, hexKey)) {
+        setBuildMenu(hexKey);
+      } else {
+        const msg = hex.owner !== pidx
+          ? (lang === 'ko' ? '자신의 영토에만 건설할 수 있습니다.' : 'You can only build on your own territory.')
+          : (lang === 'ko' ? '이미 건물이 가득 찼습니다.' : 'Cannot build here.');
+        setActionMsg(msg);
+        setSelectedHex(hexKey);
+      }
     }
   };
 
@@ -214,8 +222,8 @@ export default function JuniorGameScreen() {
               </button>
             </div>
           )}
-          {actionMsg && !actionMode && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full text-xs shadow-2xl"
+          {actionMsg && (
+            <div className={`absolute ${actionMode ? 'top-12' : 'top-2'} left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full text-xs shadow-2xl`}
               style={{ background: 'rgba(10,14,30,0.97)', border: '1px solid rgba(234,179,8,0.4)' }}>
               <span className="text-yellow-300">⚠️ {actionMsg}</span>
               <button onClick={() => setActionMsg('')} className="text-gray-500 hover:text-white transition-colors"><X size={12} /></button>

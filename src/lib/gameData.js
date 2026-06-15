@@ -533,18 +533,6 @@ export function createInitialGameState(settings, nations) {
     };
   });
 
-  // Mark every capital hex as explored by every nation so all players can see
-  // each other's starting positions on the map.
-  players.forEach((player) => {
-    const capHex = map.hexes[player.capitalHex];
-    if (capHex) {
-      players.forEach((_, idx) => {
-        if (!capHex.exploredBy) capHex.exploredBy = {};
-        capHex.exploredBy[idx] = true;
-      });
-    }
-  });
-
   return {
     settings: { ...settings, gradeMode },
     map,
@@ -558,6 +546,61 @@ export function createInitialGameState(settings, nations) {
     turnHistory: [],
     gameOver: false,
   };
+}
+
+// ============ SHARED VALIDATORS ============
+// Use these everywhere (HexMap highlights, action handlers, click validation, tooltips).
+
+export function isExploredByNation(hex, nationIndex) {
+  if (!hex) return false;
+  if (hex.exploredBy) return !!hex.exploredBy[nationIndex];
+  return !!hex.explored;
+}
+
+export function canExploreHex(gameState, nationIndex, hexKey) {
+  if (!gameState || !gameState.map) return false;
+  const hex = gameState.map.hexes[hexKey];
+  if (!hex) return false;
+  if (isExploredByNation(hex, nationIndex)) return false;
+
+  const player = gameState.players[nationIndex];
+  const hasLongRange = player?.technologies?.includes('longRangeRovers') || player?.technologies?.includes('longRangeRover');
+
+  const neighbors = getHexNeighbors(hex.q, hex.r);
+  const adjToExplored = neighbors.some(n => {
+    const nk = `${n.q},${n.r}`;
+    return isExploredByNation(gameState.map.hexes[nk], nationIndex);
+  });
+  if (adjToExplored) return true;
+
+  if (hasLongRange) {
+    return Object.values(gameState.map.hexes).some(h => {
+      if (!isExploredByNation(h, nationIndex)) return false;
+      return hexDistance(h.q, h.r, hex.q, hex.r) <= 2;
+    });
+  }
+  return false;
+}
+
+export function canClaimHex(gameState, nationIndex, hexKey) {
+  if (!gameState || !gameState.map) return false;
+  const hex = gameState.map.hexes[hexKey];
+  if (!hex) return false;
+  if (!isExploredByNation(hex, nationIndex)) return false;
+  if (hex.owner !== null && hex.owner !== undefined) return false;
+
+  return getHexNeighbors(hex.q, hex.r).some(n => {
+    const nk = `${n.q},${n.r}`;
+    const nHex = gameState.map.hexes[nk];
+    return nHex && nHex.owner === nationIndex;
+  });
+}
+
+export function canBuildOnHex(gameState, nationIndex, hexKey) {
+  if (!gameState || !gameState.map) return false;
+  const hex = gameState.map.hexes[hexKey];
+  if (!hex) return false;
+  return hex.owner === nationIndex;
 }
 
 function pickStartingPositions(hexKeys, count, map) {

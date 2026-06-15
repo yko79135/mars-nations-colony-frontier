@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { X } from 'lucide-react';
-import { BUILDINGS, TERRAIN_TYPES } from '@/lib/gameData';
+import { BUILDINGS, TERRAIN_TYPES, isExploredByNation } from '@/lib/gameData';
 
 // Resource display helpers — consistent icons used everywhere
 export const RES_ICON = {
@@ -226,8 +226,10 @@ export function HexTooltip({ hexKey, gameState, onClose, actionMode, isHover }) 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const pidx = gameState.currentPlayerIndex;
 
-  // Per-nation explored check
-  const exploredByMe = hex.exploredBy ? !!hex.exploredBy[pidx] : !!hex.explored;
+  // Per-nation explored check using shared helper
+  const exploredByMe = isExploredByNation(hex, pidx);
+  // Capital hexes are always visible even if not explored by this nation
+  const isVisible = exploredByMe || hex.isCapital;
 
   // Which buildings work well here
   const terrainBuildingTips = {
@@ -246,24 +248,37 @@ export function HexTooltip({ hexKey, gameState, onClose, actionMode, isHover }) 
   // Action-specific indicators
   const actionHint = actionMode ? getActionHint(actionMode, hex, exploredByMe, owner, currentPlayer, lang) : null;
 
-  // Hex state
+  // Hex state label
   let stateLabel = lang === 'ko' ? '미탐사' : 'Unexplored';
   let stateColor = 'text-gray-400';
-  if (exploredByMe && owner === null) { stateLabel = lang === 'ko' ? '탐사됨 — 점령 가능' : 'Explored — can be claimed'; stateColor = 'text-green-300'; }
-  if (exploredByMe && owner !== null && owner.index !== currentPlayer.index) { stateLabel = lang === 'ko' ? `${owner.countryName}의 영토` : `${owner.countryName}'s territory`; stateColor = 'text-orange-300'; }
-  if (exploredByMe && owner !== null && owner.index === currentPlayer.index) { stateLabel = lang === 'ko' ? '내 영토' : 'Your territory'; stateColor = 'text-blue-300'; }
+  if (!isVisible) {
+    stateLabel = lang === 'ko' ? '미탐사' : 'Unexplored';
+    stateColor = 'text-gray-400';
+  } else if (!exploredByMe && hex.isCapital && owner) {
+    stateLabel = lang === 'ko' ? `${owner.countryName}의 수도` : `${owner.countryName}'s capital`;
+    stateColor = 'text-orange-300';
+  } else if (exploredByMe && owner === null) {
+    stateLabel = lang === 'ko' ? '탐사됨 — 점령 가능' : 'Explored — can be claimed';
+    stateColor = 'text-green-300';
+  } else if (exploredByMe && owner !== null && owner.index !== currentPlayer.index) {
+    stateLabel = lang === 'ko' ? `${owner.countryName}의 영토` : `${owner.countryName}'s territory`;
+    stateColor = 'text-orange-300';
+  } else if (exploredByMe && owner !== null && owner.index === currentPlayer.index) {
+    stateLabel = lang === 'ko' ? '내 영토' : 'Your territory';
+    stateColor = 'text-blue-300';
+  }
 
   return (
     <div className="absolute bottom-14 left-2 z-20 w-56 bg-gray-900/98 border border-gray-600 rounded-xl shadow-2xl p-3">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded flex items-center justify-center text-xl shrink-0 border border-gray-600"
-            style={{ backgroundColor: terrain?.color || '#333' }}>
-            {exploredByMe ? (terrain?.icon || '?') : '❓'}
+            style={{ backgroundColor: isVisible ? (terrain?.color || '#333') : '#333' }}>
+            {isVisible ? (terrain?.icon || '?') : '❓'}
           </div>
           <div>
             <p className="text-white font-heading font-semibold text-xs leading-tight">
-              {exploredByMe ? (lang === 'ko' ? getTerrainNameKo(hex.terrain) : getTerrainNameEn(hex.terrain)) : (lang === 'ko' ? '미탐사 타일' : 'Unexplored Tile')}
+              {isVisible ? (lang === 'ko' ? getTerrainNameKo(hex.terrain) : getTerrainNameEn(hex.terrain)) : (lang === 'ko' ? '미탐사 타일' : 'Unexplored Tile')}
             </p>
             <p className={`text-[10px] ${stateColor}`}>{stateLabel}</p>
           </div>
@@ -303,9 +318,14 @@ export function HexTooltip({ hexKey, gameState, onClose, actionMode, isHover }) 
         </>
       )}
 
-      {!exploredByMe && (
+      {!isVisible && (
         <p className="text-gray-400 text-[10px]">
           {lang === 'ko' ? '탐사 행동을 선택하면 이 타일을 조사할 수 있어요.' : 'Choose Explore action to investigate this tile.'}
+        </p>
+      )}
+      {!exploredByMe && hex.isCapital && owner && (
+        <p className="text-gray-400 text-[10px]">
+          {lang === 'ko' ? `${owner.countryName}의 수도입니다. 탐사 기원으로 사용할 수 없습니다.` : `${owner.countryName}'s capital. Cannot be used as an exploration origin.`}
         </p>
       )}
 

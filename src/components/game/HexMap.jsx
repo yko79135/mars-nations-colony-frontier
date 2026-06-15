@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { useGame } from '@/lib/gameContext';
-import { TERRAIN_TYPES, hexToPixel, getHexCorners, getHexNeighbors, hexDistance } from '@/lib/gameData';
+import { TERRAIN_TYPES, hexToPixel, getHexCorners, getHexNeighbors, hexDistance, isExploredByNation, canExploreHex, canClaimHex, canBuildOnHex } from '@/lib/gameData';
 import { ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
 
 const HEX_SIZE = 32;
@@ -54,22 +54,18 @@ function computeFitViewBox(hexes) {
   return { x: minX - padding, y: minY - padding, w: (maxX - minX) + padding * 2, h: (maxY - minY) + padding * 2 };
 }
 
-// Helper: check if a hex has been explored by a given nation index
-function isExploredByNation(hex, nationIndex) {
-  if (!hex) return false;
-  // Support both legacy `explored: true` (global) and `exploredBy: { idx: true }`
-  if (hex.exploredBy) return !!hex.exploredBy[nationIndex];
-  return !!hex.explored; // legacy fallback
-}
-
 export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHover, onHexLeave }) {
   const { gameState, getViewBox, setViewBox, fitMapToScreen, resetMapView } = useGame();
   const containerRef = useRef(null);
 
-  // ---- Drag state — explicit and isolated from hover ----
-  const [isDragging, setIsDragging] = useState(false);
+  // ---- Drag / click state — all refs, no React state for pointer tracking ----
+  const isPointerDownRef = useRef(false);
   const dragStartRef = useRef({ mouseX: 0, mouseY: 0, viewBoxX: 0, viewBoxY: 0, w: 800, h: 600 });
   const didDragRef = useRef(false);
+  const pendingHexIdRef = useRef(null);
+  // Keep a stable ref to onHexSelect so stopDragging never goes stale
+  const onHexSelectRef = useRef(onHexSelect);
+  useEffect(() => { onHexSelectRef.current = onHexSelect; }, [onHexSelect]);
 
   const map = gameState?.map;
   const players = gameState?.players || [];
@@ -97,10 +93,10 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
     });
   }, [gameState, setViewBox]);
 
-  // ---- Pointer-based drag (mouse + touch) ----
+  // ---- Pointer-based drag (mouse + touch) with refs ----
   const handlePointerDown = useCallback((e) => {
-    if (e.button !== undefined && e.button !== 0 && e.button !== 1) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    if (e.button !== undefined && e.button !== 0) return;
+    isPointerDownRef.current = true;
     didDragRef.current = false;
     const vb = getViewBox(gameState);
     dragStartRef.current = {
@@ -111,11 +107,11 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
       w: vb.w,
       h: vb.h,
     };
-    setIsDragging(true);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
   }, [gameState, getViewBox]);
 
   const handlePointerMove = useCallback((e) => {
-    if (!isDragging) return;
+    if (!isPointerDownRef.current) return;
     const dx = e.clientX - dragStartRef.current.mouseX;
     const dy = e.clientY - dragStartRef.current.mouseY;
     if (!didDragRef.current && Math.abs(dx) + Math.abs(dy) > 5) {
@@ -124,7 +120,6 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
     if (!didDragRef.current) return;
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    // Convert pixel delta to SVG-space delta
     const svgDx = dx * (dragStartRef.current.w / rect.width);
     const svgDy = dy * (dragStartRef.current.h / rect.height);
     setViewBox(gameState, prev => ({
@@ -132,17 +127,26 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
       x: dragStartRef.current.viewBoxX - svgDx,
       y: dragStartRef.current.viewBoxY - svgDy,
     }));
-  }, [isDragging, gameState, setViewBox]);
+  }, [gameState, setViewBox]);
 
+  // Called on pointerup/pointercancel — resolves click vs drag
   const stopDragging = useCallback((e) => {
-    setIsDragging(false);
-    // Release pointer capture so subsequent clicks on child hexes work.
-    // Only valid for PointerEvents (has pointerId); TouchEvents lack it.
+    const wasDragging = didDragRef.current;
+    isPointerDownRef.current = false;
+    didDragRef.current = false;
+
     if (e && e.pointerId !== undefined) {
-      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+      try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch (_) {}
     }
-    // Reset drag flag after a microtask so onClick on the same frame isn't blocked
-    window.setTimeout(() => { didDragRef.current = false; }, 0);
+
+    // If this was a click (not a drag) and a hex was the target, activate it
+    if (!wasDragging && pendingHexIdRef.current) {
+      const hexId = pendingHexIdRef.current;
+      pendingHexIdRef.current = null;
+      onHexSelectRef.current(hexId);
+    } else {
+      pendingHexIdRef.current = null;
+    }
   }, []);
 
   // Touch events (supplemental — pointer events already handle touch on most browsers)
@@ -152,6 +156,7 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
     const vb = getViewBox(gameState);
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, vbX: vb.x, vbY: vb.y, w: vb.w, h: vb.h };
     didDragRef.current = false;
+    isPointerDownRef.current = true;
   }, [gameState, getViewBox]);
 
   const handleTouchMove = useCallback((e) => {
@@ -178,51 +183,16 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
     return () => el.removeEventListener('wheel', onWheel);
   }, [handleZoom]);
 
-  // ---- Valid tile computation ----
+  // ---- Valid tile computation using shared validators ----
   const validTiles = useMemo(() => {
     if (!map || !gameState || !actionMode) return new Set();
     const valid = new Set();
     const pidx = gameState.currentPlayerIndex;
-    const player = gameState.players[pidx];
-    const hasLongRange = player?.technologies?.includes('longRangeRovers') || player?.technologies?.includes('longRangeRover');
 
-    Object.entries(map.hexes).forEach(([key, hex]) => {
-      if (actionMode === 'explore') {
-        // Target must be unexplored by current nation
-        if (isExploredByNation(hex, pidx)) return;
-        // Must be adjacent to an explored-by-this-nation tile
-        const neighbors = getHexNeighbors(hex.q, hex.r);
-        const adjToExplored = neighbors.some(n => {
-          const nk = `${n.q},${n.r}`;
-          return map.hexes[nk] && isExploredByNation(map.hexes[nk], pidx);
-        });
-        if (adjToExplored) { valid.add(key); return; }
-        // Long-range rover: within distance 2 of any explored tile
-        if (hasLongRange) {
-          const inRange = Object.values(map.hexes).some(h => {
-            if (!isExploredByNation(h, pidx)) return false;
-            return hexDistance(h.q, h.r, hex.q, hex.r) <= 2;
-          });
-          if (inRange) valid.add(key);
-        }
-      }
-
-      if (actionMode === 'claim') {
-        // Target must be explored (by anyone or by current nation for consistency) and unclaimed
-        if (!isExploredByNation(hex, pidx)) return;
-        if (hex.owner !== null && hex.owner !== undefined) return;
-        // Must be adjacent to owned territory
-        const neighbors = getHexNeighbors(hex.q, hex.r);
-        const adjOwned = neighbors.some(n => {
-          const nk = `${n.q},${n.r}`;
-          return map.hexes[nk] && map.hexes[nk].owner === pidx;
-        });
-        if (adjOwned) valid.add(key);
-      }
-
-      if (actionMode === 'build' && hex.owner === pidx) {
-        valid.add(key);
-      }
+    Object.keys(map.hexes).forEach(key => {
+      if (actionMode === 'explore' && canExploreHex(gameState, pidx, key)) valid.add(key);
+      if (actionMode === 'claim'   && canClaimHex(gameState, pidx, key))   valid.add(key);
+      if (actionMode === 'build'   && canBuildOnHex(gameState, pidx, key)) valid.add(key);
     });
     return valid;
   }, [map, gameState?.currentPlayerIndex, actionMode, gameState?.players]);
@@ -252,7 +222,7 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
 
       <svg
         className="w-full h-full select-none"
-        style={{ cursor: isDragging ? 'grabbing' : actionMode ? 'crosshair' : 'grab', touchAction: 'none' }}
+        style={{ cursor: isPointerDownRef.current ? 'grabbing' : actionMode ? 'crosshair' : 'grab', touchAction: 'none' }}
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -300,12 +270,12 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
         </defs>
 
         {/* Space background */}
-        <rect x={viewBox.x - 2000} y={viewBox.y - 2000} width={viewBox.w + 4000} height={viewBox.h + 4000} fill="#04080f" />
+        <rect x={viewBox.x - 2000} y={viewBox.y - 2000} width={viewBox.w + 4000} height={viewBox.h + 4000} fill="#04080f" pointerEvents="none" />
         {Array.from({ length: 80 }).map((_, i) => {
           const sx = viewBox.x + (i * 97 % (viewBox.w + 3000)) - 1000;
           const sy = viewBox.y + (i * 137 % (viewBox.h + 3000)) - 1000;
           const r = i % 5 === 0 ? 1.2 : 0.6;
-          return <circle key={i} cx={sx} cy={sy} r={r} fill="white" opacity={0.15 + (i % 4) * 0.08} />;
+          return <circle key={i} cx={sx} cy={sy} r={r} fill="white" opacity={0.15 + (i % 4) * 0.08} pointerEvents="none" />;
         })}
 
         {/* Hex tiles */}
@@ -319,10 +289,10 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
           const isSelected = selectedHex === key;
           const isValid = validTiles.has(key);
           const ownerColor = hex.owner !== null && hex.owner !== undefined ? players[hex.owner]?.colorHex : null;
-          const palette = TERRAIN_PALETTE[hex.terrain] || TERRAIN_PALETTE.rockyPlain;
 
-          // Visibility: shown as explored if this nation explored it
+          // Visibility: hex is visible if explored by current nation OR it's any capital
           const exploredByMe = isExploredByNation(hex, pidx);
+          const isVisible = exploredByMe || hex.isCapital;
 
           let strokeColor = 'rgba(255,255,255,0.06)';
           let strokeWidth = 0.8;
@@ -334,105 +304,115 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
           else if (ownerColor) { strokeColor = ownerColor; strokeWidth = 2; }
 
           const settlementLevel = hex.settlement ? getSettlementLevel(hex) : 0;
-          const terrainIcon = exploredByMe ? (TERRAIN_ICONS[hex.terrain] || '🪨') : '?';
+          const terrainIcon = isVisible ? (TERRAIN_ICONS[hex.terrain] || '🪨') : '?';
           const buildings = hex.buildings || [];
           const topBuilding = buildings.length > 0 ? BUILDING_ICONS[buildings[buildings.length - 1]] || '🏗️' : null;
 
           return (
             <g key={key}
               onMouseEnter={() => onHexHover?.(key)}
-              onMouseLeave={() => onHexLeave?.(key)}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!didDragRef.current) onHexSelect(key);
-              }}
-              style={{ cursor: isValid ? 'pointer' : 'inherit' }}>
+              onMouseLeave={() => onHexLeave?.(key)}>
 
+              {/* Transparent hit polygon — catches pointer events for this hex */}
               <polygon points={points}
-                fill={exploredByMe ? `url(#tg-${hex.terrain})` : 'url(#tg-fog)'}
-                stroke={strokeColor} strokeWidth={strokeWidth}
-                opacity={exploredByMe ? 1 : 0.7}
-                filter={glowFilter || undefined}
+                fill="transparent"
+                stroke="none"
+                style={{ pointerEvents: 'all', cursor: isValid ? 'pointer' : 'inherit' }}
+                onPointerDown={(e) => {
+                  // Don't stop propagation — let the parent SVG also get the event for dragging.
+                  // Just record which hex the pointer went down on.
+                  pendingHexIdRef.current = key;
+                }}
               />
 
-              {exploredByMe && (
-                <polygon points={innerPoints}
-                  fill="none"
-                  stroke="rgba(0,0,0,0.25)"
-                  strokeWidth={1.5}
-                />
-              )}
-
-              {ownerColor && exploredByMe && (
-                <polygon points={points} fill={ownerColor} opacity={0.12} stroke="none" />
-              )}
-
-              {isValid && !isSelected && (
+              {/* Visual layers — all pointerEvents="none" so they don't block hits */}
+              <g pointerEvents="none">
                 <polygon points={points}
-                  fill={ACTION_GLOW[actionMode] || '#fff'}
-                  opacity={0.10} stroke="none" />
-              )}
+                  fill={isVisible ? `url(#tg-${hex.terrain})` : 'url(#tg-fog)'}
+                  stroke={strokeColor} strokeWidth={strokeWidth}
+                  opacity={isVisible ? 1 : 0.7}
+                  filter={glowFilter || undefined}
+                />
 
-              {!exploredByMe && (
-                <polygon points={points} fill="rgba(20,10,30,0.45)" stroke="none" />
-              )}
+                {isVisible && (
+                  <polygon points={innerPoints}
+                    fill="none"
+                    stroke="rgba(0,0,0,0.25)"
+                    strokeWidth={1.5}
+                  />
+                )}
 
-              <text x={x} y={exploredByMe && settlementLevel > 0 ? y + 5 : y + 1}
-                textAnchor="middle" dominantBaseline="middle"
-                fontSize={exploredByMe ? 11 : 8}
-                opacity={exploredByMe ? 0.75 : 0.2}
-                style={{ pointerEvents: 'none', userSelect: 'none' }}>{terrainIcon}</text>
+                {ownerColor && isVisible && (
+                  <polygon points={points} fill={ownerColor} opacity={0.12} stroke="none" />
+                )}
 
-              {topBuilding && exploredByMe && !hex.settlement && (
-                <text x={x} y={y - 7} textAnchor="middle" dominantBaseline="middle"
-                  fontSize={9} opacity={0.85}
-                  style={{ pointerEvents: 'none', userSelect: 'none' }}>{topBuilding}</text>
-              )}
+                {isValid && !isSelected && (
+                  <polygon points={points}
+                    fill={ACTION_GLOW[actionMode] || '#fff'}
+                    opacity={0.10} stroke="none" />
+                )}
 
-              {hex.settlement && exploredByMe && (
-                <>
-                  <circle cx={x} cy={y - HEX_SIZE * 0.42} r={9 + settlementLevel * 1.5}
-                    fill={ownerColor || '#fff'} opacity={0.18} />
-                  <circle cx={x} cy={y - HEX_SIZE * 0.42} r={6 + settlementLevel}
-                    fill={ownerColor || '#f5c518'} opacity={0.92}
-                    stroke="rgba(255,255,255,0.6)" strokeWidth={0.8} />
-                  <text x={x} y={y - HEX_SIZE * 0.42 + 1}
-                    textAnchor="middle" dominantBaseline="middle"
-                    fontSize={hex.isCapital ? 7 + settlementLevel : 5 + settlementLevel}
-                    fill="#fff" fontWeight="bold"
-                    style={{ pointerEvents: 'none', userSelect: 'none' }}>
-                    {hex.isCapital ? '★' : '◆'}
-                  </text>
-                  {buildings.slice(0, 3).map((bId, bi) => (
-                    <text key={bi}
-                      x={x - 8 + bi * 8} y={y + 2}
-                      textAnchor="middle" dominantBaseline="middle"
-                      fontSize={7} opacity={0.8}
-                      style={{ pointerEvents: 'none', userSelect: 'none' }}>
-                      {BUILDING_ICONS[bId] || '🏗️'}
-                    </text>
-                  ))}
-                </>
-              )}
+                {!isVisible && (
+                  <polygon points={points} fill="rgba(20,10,30,0.45)" stroke="none" />
+                )}
 
-              {hex.owner !== null && hex.owner !== undefined && !hex.settlement && (
-                <text x={x} y={y + HEX_SIZE * 0.48}
+                <text x={x} y={isVisible && settlementLevel > 0 ? y + 5 : y + 1}
                   textAnchor="middle" dominantBaseline="middle"
-                  fontSize={5.5} fill={ownerColor || '#fff'} fontWeight="bold" opacity={0.75}
-                  style={{ pointerEvents: 'none', userSelect: 'none' }}>
-                  {players[hex.owner]?.abbreviation}
-                </text>
-              )}
+                  fontSize={isVisible ? 11 : 8}
+                  opacity={isVisible ? 0.75 : 0.2}
+                  style={{ userSelect: 'none' }}>{terrainIcon}</text>
 
-              {hex.owner !== null && hex.owner !== undefined && ownerColor && !hex.settlement && exploredByMe && (
-                <circle cx={x} cy={y} r={2} fill={ownerColor} opacity={0.6} style={{ pointerEvents: 'none' }} />
-              )}
+                {topBuilding && isVisible && !hex.settlement && (
+                  <text x={x} y={y - 7} textAnchor="middle" dominantBaseline="middle"
+                    fontSize={9} opacity={0.85}
+                    style={{ userSelect: 'none' }}>{topBuilding}</text>
+                )}
 
-              {!exploredByMe && (
-                <text x={x} y={y - 1} textAnchor="middle" dominantBaseline="middle"
-                  fontSize={10} fill="rgba(255,255,255,0.15)"
-                  style={{ pointerEvents: 'none', userSelect: 'none' }}>?</text>
-              )}
+                {hex.settlement && isVisible && (
+                  <>
+                    <circle cx={x} cy={y - HEX_SIZE * 0.42} r={9 + settlementLevel * 1.5}
+                      fill={ownerColor || '#fff'} opacity={0.18} />
+                    <circle cx={x} cy={y - HEX_SIZE * 0.42} r={6 + settlementLevel}
+                      fill={ownerColor || '#f5c518'} opacity={0.92}
+                      stroke="rgba(255,255,255,0.6)" strokeWidth={0.8} />
+                    <text x={x} y={y - HEX_SIZE * 0.42 + 1}
+                      textAnchor="middle" dominantBaseline="middle"
+                      fontSize={hex.isCapital ? 7 + settlementLevel : 5 + settlementLevel}
+                      fill="#fff" fontWeight="bold"
+                      style={{ userSelect: 'none' }}>
+                      {hex.isCapital ? '★' : '◆'}
+                    </text>
+                    {buildings.slice(0, 3).map((bId, bi) => (
+                      <text key={bi}
+                        x={x - 8 + bi * 8} y={y + 2}
+                        textAnchor="middle" dominantBaseline="middle"
+                        fontSize={7} opacity={0.8}
+                        style={{ userSelect: 'none' }}>
+                        {BUILDING_ICONS[bId] || '🏗️'}
+                      </text>
+                    ))}
+                  </>
+                )}
+
+                {hex.owner !== null && hex.owner !== undefined && !hex.settlement && (
+                  <text x={x} y={y + HEX_SIZE * 0.48}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={5.5} fill={ownerColor || '#fff'} fontWeight="bold" opacity={0.75}
+                    style={{ userSelect: 'none' }}>
+                    {players[hex.owner]?.abbreviation}
+                  </text>
+                )}
+
+                {hex.owner !== null && hex.owner !== undefined && ownerColor && !hex.settlement && isVisible && (
+                  <circle cx={x} cy={y} r={2} fill={ownerColor} opacity={0.6} />
+                )}
+
+                {!isVisible && (
+                  <text x={x} y={y - 1} textAnchor="middle" dominantBaseline="middle"
+                    fontSize={10} fill="rgba(255,255,255,0.15)"
+                    style={{ userSelect: 'none' }}>?</text>
+                )}
+              </g>
             </g>
           );
         })}
