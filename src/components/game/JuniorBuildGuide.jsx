@@ -196,8 +196,26 @@ export function BuildingGuideModal({ onClose }) {
   );
 }
 
-// Hex tooltip shown when a hex is selected
-export function HexTooltip({ hexKey, gameState, onClose }) {
+// Helper: get action-specific hint for the tooltip
+function getActionHint(actionMode, hex, exploredByMe, owner, currentPlayer, lang) {
+  if (actionMode === 'explore') {
+    if (exploredByMe) return lang === 'ko' ? '이미 탐사한 타일입니다.' : 'Already explored by you.';
+    return lang === 'ko' ? '클릭하면 탐사합니다!' : 'Click to explore!';
+  }
+  if (actionMode === 'claim') {
+    if (!exploredByMe) return lang === 'ko' ? '먼저 탐사해야 합니다.' : 'Must explore first.';
+    if (owner) return lang === 'ko' ? '이미 다른 국가의 영토입니다.' : 'Already owned by another nation.';
+    return lang === 'ko' ? '클릭하면 영토로 선언합니다!' : 'Click to claim this territory!';
+  }
+  if (actionMode === 'build') {
+    if (owner?.index !== currentPlayer.index) return lang === 'ko' ? '자신의 영토에만 지을 수 있습니다.' : 'Can only build on your own territory.';
+    return lang === 'ko' ? '클릭하면 건물을 선택합니다!' : 'Click to choose a building!';
+  }
+  return null;
+}
+
+// Hex tooltip shown when a hex is selected or hovered
+export function HexTooltip({ hexKey, gameState, onClose, actionMode, isHover }) {
   const { lang } = useLang();
   if (!hexKey || !gameState) return null;
   const hex = gameState.map.hexes[hexKey];
@@ -206,6 +224,10 @@ export function HexTooltip({ hexKey, gameState, onClose }) {
   const terrain = TERRAIN_TYPES[hex.terrain];
   const owner = hex.owner !== null ? gameState.players[hex.owner] : null;
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+  const pidx = gameState.currentPlayerIndex;
+
+  // Per-nation explored check
+  const exploredByMe = hex.exploredBy ? !!hex.exploredBy[pidx] : !!hex.explored;
 
   // Which buildings work well here
   const terrainBuildingTips = {
@@ -221,8 +243,8 @@ export function HexTooltip({ hexKey, gameState, onClose }) {
   };
   const tip = terrainBuildingTips[hex.terrain];
 
-  const pidx = gameState.currentPlayerIndex;
-  const exploredByMe = hex.exploredBy ? !!hex.exploredBy[pidx] : !!hex.explored;
+  // Action-specific indicators
+  const actionHint = actionMode ? getActionHint(actionMode, hex, exploredByMe, owner, currentPlayer, lang) : null;
 
   // Hex state
   let stateLabel = lang === 'ko' ? '미탐사' : 'Unexplored';
@@ -285,6 +307,17 @@ export function HexTooltip({ hexKey, gameState, onClose }) {
         <p className="text-gray-400 text-[10px]">
           {lang === 'ko' ? '탐사 행동을 선택하면 이 타일을 조사할 수 있어요.' : 'Choose Explore action to investigate this tile.'}
         </p>
+      )}
+
+      {/* Action-specific hint on hover */}
+      {actionHint && isHover && (
+        <div className="mt-2 text-[10px] px-2 py-1 rounded"
+          style={{
+            background: actionMode === 'explore' ? 'rgba(96,165,250,0.15)' : actionMode === 'claim' ? 'rgba(74,222,128,0.15)' : 'rgba(251,191,36,0.15)',
+            border: `1px solid ${actionMode === 'explore' ? 'rgba(96,165,250,0.35)' : actionMode === 'claim' ? 'rgba(74,222,128,0.35)' : 'rgba(251,191,36,0.35)'}`,
+          }}>
+          {actionHint}
+        </div>
       )}
     </div>
   );

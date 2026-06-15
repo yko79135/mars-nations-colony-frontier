@@ -61,6 +61,7 @@ export default function JuniorGameScreen() {
   const { gameState, endTurn, buildOnHex, exploreHex, claimHex } = useGame();
   const { t, lang } = useLang();
   const [selectedHex, setSelectedHex] = useState(null);
+  const [hoveredHex, setHoveredHex] = useState(null);
   const [actionMode, setActionMode] = useState(null);
   const [showResearch, setShowResearch] = useState(false);
   const [showCoop, setShowCoop] = useState(false);
@@ -93,11 +94,14 @@ export default function JuniorGameScreen() {
     const hex = gameState.map.hexes[hexKey];
     if (!hex) return;
 
-    if (actionMode === 'explore' && !hex.explored) {
+    const pidx = gameState.currentPlayerIndex;
+    const hexExploredByMe = hex.exploredBy ? !!hex.exploredBy[pidx] : !!hex.explored;
+
+    if (actionMode === 'explore' && !hexExploredByMe) {
       exploreHex(hexKey);
       setActionMode(null);
       setSelectedHex(null);
-    } else if (actionMode === 'claim' && hex.explored && hex.owner === null) {
+    } else if (actionMode === 'claim' && hexExploredByMe && hex.owner === null) {
       claimHex(hexKey);
       setActionMode(null);
       setSelectedHex(null);
@@ -135,7 +139,10 @@ export default function JuniorGameScreen() {
     { key: 'science',  icon: RES_ICON.science,   color: 'text-purple-400', label: lang === 'ko' ? '연구' : 'Research' },
   ];
 
-  const hexForTooltip = selectedHex && !buildMenu && !actionMode ? selectedHex : null;
+  // Show tooltip: on hover (always, even during action) or on click (when no action active)
+  const hexForTooltip = buildMenu ? null : (hoveredHex || (selectedHex && !actionMode ? selectedHex : null));
+  // When hovering during an action, show action-specific context in tooltip
+  const tooltipActionMode = hoveredHex ? actionMode : null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)]" style={{ background: '#04080f' }}>
@@ -215,19 +222,27 @@ export default function JuniorGameScreen() {
             </div>
           )}
 
-          <HexMap onHexSelect={handleHexSelect} selectedHex={selectedHex} actionMode={actionMode} />
+          <HexMap
+            onHexSelect={handleHexSelect}
+            selectedHex={selectedHex}
+            actionMode={actionMode}
+            onHexHover={setHoveredHex}
+            onHexLeave={() => setHoveredHex(null)}
+          />
 
           {/* Save button */}
           <button onClick={() => setShowSave(true)} className="absolute bottom-2 left-2 z-10 w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600">
             <Save size={14} />
           </button>
 
-          {/* Hex tooltip (shown when hex selected but no action active) */}
+          {/* Hex tooltip (shown on hover or when hex selected with no action) */}
           {hexForTooltip && (
             <HexTooltip
               hexKey={hexForTooltip}
               gameState={gameState}
-              onClose={() => setSelectedHex(null)}
+              onClose={() => { setSelectedHex(null); setHoveredHex(null); }}
+              actionMode={tooltipActionMode}
+              isHover={!!hoveredHex}
             />
           )}
 

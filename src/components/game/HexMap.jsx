@@ -62,7 +62,7 @@ function isExploredByNation(hex, nationIndex) {
   return !!hex.explored; // legacy fallback
 }
 
-export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
+export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHover, onHexLeave }) {
   const { gameState, getViewBox, setViewBox, fitMapToScreen, resetMapView } = useGame();
   const containerRef = useRef(null);
 
@@ -134,8 +134,15 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
     }));
   }, [isDragging, gameState, setViewBox]);
 
-  const stopDragging = useCallback(() => {
+  const stopDragging = useCallback((e) => {
     setIsDragging(false);
+    // Release pointer capture so subsequent clicks on child hexes work.
+    // Only valid for PointerEvents (has pointerId); TouchEvents lack it.
+    if (e && e.pointerId !== undefined) {
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+    }
+    // Reset drag flag after a microtask so onClick on the same frame isn't blocked
+    window.setTimeout(() => { didDragRef.current = false; }, 0);
   }, []);
 
   // Touch events (supplemental — pointer events already handle touch on most browsers)
@@ -333,6 +340,8 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
 
           return (
             <g key={key}
+              onMouseEnter={() => onHexHover?.(key)}
+              onMouseLeave={() => onHexLeave?.(key)}
               onClick={(e) => {
                 e.stopPropagation();
                 if (!didDragRef.current) onHexSelect(key);

@@ -481,7 +481,8 @@ export function createInitialGameState(settings, nations) {
     const hexKey = startPositions[i];
     const hex = map.hexes[hexKey];
     hex.explored = true;
-    hex.exploredBy = { [i]: true };
+    if (!hex.exploredBy) hex.exploredBy = {};
+    hex.exploredBy[i] = true;
     hex.owner = i;
     hex.isCapital = true;
     hex.settlement = { name: nation.colonyName, level: 1 };
@@ -530,6 +531,18 @@ export function createInitialGameState(settings, nations) {
       scores: { territory: 1, science: 0, population: res.population || 0, livingConditions: 50, economic: 0, cooperation: 0, sustainability: 0, achievement: 0 },
       capitalHex: hexKey,
     };
+  });
+
+  // Mark every capital hex as explored by every nation so all players can see
+  // each other's starting positions on the map.
+  players.forEach((player) => {
+    const capHex = map.hexes[player.capitalHex];
+    if (capHex) {
+      players.forEach((_, idx) => {
+        if (!capHex.exploredBy) capHex.exploredBy = {};
+        capHex.exploredBy[idx] = true;
+      });
+    }
   });
 
   return {

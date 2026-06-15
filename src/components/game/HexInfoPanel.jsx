@@ -147,14 +147,14 @@ export default function HexInfoPanel({ hexKey, onClose, actionMode }) {
 
           {/* Actions */}
           <div className="space-y-2 pt-1">
-            {actionMode === 'explore' && !hex.explored && (
+            {actionMode === 'explore' && !exploredByMe && (
               <button onClick={() => exploreHex(hexKey)} disabled={gameState.actionPoints <= 0}
                 className="w-full py-2.5 rounded-xl text-xs font-heading font-bold transition-all disabled:opacity-40"
                 style={{ background: 'rgba(96,165,250,0.2)', border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd' }}>
                 🔭 {t.actions.explore}
               </button>
             )}
-            {actionMode === 'claim' && hex.explored && hex.owner === null && (
+            {actionMode === 'claim' && exploredByMe && hex.owner === null && (
               <button onClick={() => claimHex(hexKey)} disabled={gameState.actionPoints <= 0}
                 className="w-full py-2.5 rounded-xl text-xs font-heading font-bold transition-all disabled:opacity-40"
                 style={{ background: 'rgba(74,222,128,0.2)', border: '1px solid rgba(74,222,128,0.4)', color: '#86efac' }}>
@@ -184,7 +184,7 @@ export default function HexInfoPanel({ hexKey, onClose, actionMode }) {
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
           <span className="text-5xl opacity-30">?</span>
           <p className="text-gray-500 text-sm">{t.terrain.unexplored}</p>
-          {actionMode === 'explore' && (
+          {actionMode === 'explore' && !exploredByMe && (
             <button onClick={() => exploreHex(hexKey)} disabled={gameState.actionPoints <= 0}
               className="px-5 py-2.5 rounded-xl text-xs font-heading font-bold transition-all disabled:opacity-40"
               style={{ background: 'rgba(96,165,250,0.2)', border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd' }}>

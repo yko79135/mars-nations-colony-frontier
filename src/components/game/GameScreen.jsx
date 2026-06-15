@@ -75,7 +75,7 @@ export default function GameScreen() {
         <button onClick={() => setShowSave(true)} className="absolute bottom-3 left-3 z-10 w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600">
           <Save size={16} />
         </button>
-        <HexMap onHexSelect={setSelectedHex} selectedHex={selectedHex} actionMode={actionMode} />
+        <HexMap onHexSelect={setSelectedHex} selectedHex={selectedHex} actionMode={actionMode} onHexHover={() => {}} onHexLeave={() => {}} />
         <MapLegend />
       </div>
 
