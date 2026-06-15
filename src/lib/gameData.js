@@ -1,19 +1,86 @@
 // ============ TERRAIN DEFINITIONS ============
 export const TERRAIN_TYPES = {
-  rockyPlain: { color: '#8B6914', icon: '🪨', energyMod: 0, waterMod: 0, mineralMod: 0, constructionDifficulty: 'low', radiationRisk: 'medium' },
-  crater: { color: '#6B4423', icon: '🕳️', energyMod: 0, waterMod: 0, mineralMod: 1, constructionDifficulty: 'medium', radiationRisk: 'medium' },
-  mountain: { color: '#5C4033', icon: '⛰️', energyMod: 0, waterMod: 0, mineralMod: 2, constructionDifficulty: 'high', radiationRisk: 'low' },
-  canyon: { color: '#7B3F00', icon: '🏜️', energyMod: 0, waterMod: 1, mineralMod: 0, constructionDifficulty: 'high', radiationRisk: 'low' },
-  iceDeposit: { color: '#A8C8D8', icon: '🧊', energyMod: 0, waterMod: 3, mineralMod: 0, constructionDifficulty: 'medium', radiationRisk: 'medium' },
-  mineralDeposit: { color: '#B87333', icon: '💎', energyMod: 0, waterMod: 0, mineralMod: 3, constructionDifficulty: 'medium', radiationRisk: 'medium' },
-  lavaField: { color: '#2D1B0E', icon: '🌋', energyMod: 1, waterMod: 0, mineralMod: 1, constructionDifficulty: 'extreme', radiationRisk: 'high' },
-  dustBasin: { color: '#C4A35A', icon: '🏖️', energyMod: 1, waterMod: 0, mineralMod: 0, constructionDifficulty: 'low', radiationRisk: 'medium' },
-  highRadiation: { color: '#4A0E0E', icon: '☢️', energyMod: 0, waterMod: 0, mineralMod: 1, constructionDifficulty: 'high', radiationRisk: 'extreme' },
-  polarIce: { color: '#D4E6F1', icon: '❄️', energyMod: 0, waterMod: 4, mineralMod: 0, constructionDifficulty: 'high', radiationRisk: 'low' },
+  rockyPlain:      { color: '#8B6914', icon: '🪨', energyMod: 0, waterMod: 0, mineralMod: 0 },
+  crater:          { color: '#6B4423', icon: '🕳️', energyMod: 0, waterMod: 0, mineralMod: 1 },
+  mountain:        { color: '#5C4033', icon: '⛰️', energyMod: 0, waterMod: 0, mineralMod: 2 },
+  canyon:          { color: '#7B3F00', icon: '🏜️', energyMod: 0, waterMod: 1, mineralMod: 0 },
+  iceDeposit:      { color: '#A8C8D8', icon: '🧊', energyMod: 0, waterMod: 3, mineralMod: 0 },
+  mineralDeposit:  { color: '#B87333', icon: '💎', energyMod: 0, waterMod: 0, mineralMod: 3 },
+  lavaField:       { color: '#2D1B0E', icon: '🌋', energyMod: 1, waterMod: 0, mineralMod: 1 },
+  dustBasin:       { color: '#C4A35A', icon: '🏖️', energyMod: 1, waterMod: 0, mineralMod: 0 },
+  highRadiation:   { color: '#4A0E0E', icon: '☢️', energyMod: 0, waterMod: 0, mineralMod: 1 },
+  polarIce:        { color: '#D4E6F1', icon: '❄️', energyMod: 0, waterMod: 4, mineralMod: 0 },
 };
 
-// ============ BUILDING DEFINITIONS ============
+// ============ BUILDINGS ============
+// Junior buildings: habitat, solarFarm, waterExtractor, greenhouse, mine, researchModule
+// Senior buildings: all of the above plus researchLab, advancedResearchLab, and others
 export const BUILDINGS = {
+  // ---- JUNIOR BUILDINGS ----
+  habitat: {
+    juniorOnly: true,
+    cost: { minerals: 4 },
+    maintenance: {},
+    production: { population: 5 },
+    maxLevel: 3,
+    techRequired: null,
+    terrainRestrictions: ['lavaField', 'highRadiation'],
+    juniorLabel: 'Habitat',
+    juniorLabelKo: '거주지',
+  },
+  solarFarm: {
+    cost: { minerals: 3 },
+    maintenance: {},
+    production: { energy: 4 },
+    maxLevel: 3,
+    techRequired: null,
+    terrainRestrictions: ['canyon'],
+    juniorLabel: 'Power Station',
+    juniorLabelKo: '발전소',
+  },
+  waterExtractor: {
+    cost: { minerals: 3, energy: 1 },
+    maintenance: { energy: 1 },
+    production: { water: 4 },
+    maxLevel: 3,
+    techRequired: null,
+    terrainRestrictions: ['lavaField'],
+    juniorLabel: 'Water Station',
+    juniorLabelKo: '물 공급소',
+  },
+  greenhouse: {
+    cost: { minerals: 4, water: 1 },
+    maintenance: { water: 1 },
+    production: { food: 4 },
+    maxLevel: 3,
+    techRequired: null,
+    terrainRestrictions: ['highRadiation', 'lavaField'],
+    juniorLabel: 'Farm',
+    juniorLabelKo: '농장',
+  },
+  mine: {
+    cost: { energy: 2 },
+    maintenance: { energy: 1 },
+    production: { minerals: 4 },
+    maxLevel: 3,
+    techRequired: null,
+    terrainRestrictions: [],
+    juniorLabel: 'Mine',
+    juniorLabelKo: '광산',
+  },
+  researchModule: {
+    cost: {},  // free — placed at capital start
+    maintenance: {},
+    production: { science: 1 },
+    maxLevel: 1,
+    techRequired: null,
+    terrainRestrictions: [],
+    startingBuilding: true,
+    juniorLabel: 'Research Station',
+    juniorLabelKo: '연구 기지',
+  },
+
+  // ---- SENIOR BUILDINGS ----
   landingHabitat: {
     cost: { minerals: 5, energy: 3 },
     maintenance: { energy: 1 },
@@ -23,44 +90,20 @@ export const BUILDINGS = {
     terrainRestrictions: ['lavaField', 'highRadiation'],
   },
   advancedHabitat: {
-    cost: { minerals: 10, energy: 5, credits: 5 },
+    cost: { minerals: 10, energy: 5, science: 3 },
     maintenance: { energy: 2 },
     production: { population: 15 },
     maxLevel: 3,
     techRequired: 'printedHabitats',
     terrainRestrictions: ['lavaField', 'highRadiation'],
   },
-  solarFarm: {
-    cost: { minerals: 4, credits: 2 },
-    maintenance: {},
-    production: { energy: 5 },
-    maxLevel: 3,
-    techRequired: null,
-    terrainRestrictions: ['canyon'],
-  },
   nuclearReactor: {
-    cost: { minerals: 15, credits: 10, science: 5 },
+    cost: { minerals: 15, science: 8 },
     maintenance: { water: 1 },
     production: { energy: 15 },
     maxLevel: 2,
     techRequired: 'smallNuclear',
     terrainRestrictions: [],
-  },
-  waterExtractor: {
-    cost: { minerals: 4, energy: 2 },
-    maintenance: { energy: 1 },
-    production: { water: 4 },
-    maxLevel: 3,
-    techRequired: null,
-    terrainRestrictions: ['lavaField'],
-  },
-  greenhouse: {
-    cost: { minerals: 5, water: 2, energy: 2 },
-    maintenance: { water: 1, energy: 1 },
-    production: { food: 4, oxygen: 2 },
-    maxLevel: 3,
-    techRequired: null,
-    terrainRestrictions: ['highRadiation', 'lavaField'],
   },
   algaeFarm: {
     cost: { minerals: 6, water: 3, science: 2 },
@@ -70,41 +113,43 @@ export const BUILDINGS = {
     techRequired: 'hydroponics',
     terrainRestrictions: ['highRadiation'],
   },
-  mine: {
-    cost: { energy: 3, credits: 2 },
-    maintenance: { energy: 2 },
-    production: { minerals: 5 },
-    maxLevel: 3,
-    techRequired: null,
-    terrainRestrictions: [],
-  },
   factory: {
     cost: { minerals: 8, energy: 5 },
     maintenance: { energy: 3, minerals: 1 },
-    production: { credits: 5 },
+    production: { science: 2 },
     maxLevel: 3,
     techRequired: 'manufacturing',
     terrainRestrictions: [],
   },
   researchLab: {
-    cost: { minerals: 6, energy: 3, credits: 3 },
+    cost: { minerals: 6, energy: 3, science: 2 },
     maintenance: { energy: 2 },
-    production: { science: 4 },
+    production: { science: 3 },
     maxLevel: 3,
     techRequired: null,
     terrainRestrictions: ['lavaField', 'highRadiation'],
+    labLevel: 1,
+  },
+  advancedResearchLab: {
+    cost: { minerals: 12, energy: 6, science: 8 },
+    maintenance: { energy: 3 },
+    production: { science: 5 },
+    maxLevel: 1,
+    techRequired: 'robotics',
+    terrainRestrictions: ['lavaField', 'highRadiation'],
+    labLevel: 2,
   },
   medicalCenter: {
-    cost: { minerals: 7, energy: 3, credits: 4 },
-    maintenance: { energy: 1, credits: 1 },
+    cost: { minerals: 7, energy: 3, science: 2 },
+    maintenance: { energy: 1 },
     production: { morale: 2 },
     maxLevel: 2,
     techRequired: 'medicalSystems',
     terrainRestrictions: [],
   },
   recreationCenter: {
-    cost: { minerals: 5, credits: 5 },
-    maintenance: { energy: 1, credits: 1 },
+    cost: { minerals: 5, science: 2 },
+    maintenance: { energy: 1 },
     production: { morale: 4 },
     maxLevel: 2,
     techRequired: 'recreation',
@@ -113,15 +158,15 @@ export const BUILDINGS = {
   commsCenter: {
     cost: { minerals: 6, energy: 4, science: 2 },
     maintenance: { energy: 2 },
-    production: { credits: 2, science: 1 },
+    production: { science: 1 },
     maxLevel: 2,
     techRequired: null,
     terrainRestrictions: [],
   },
   tradeHub: {
-    cost: { minerals: 8, credits: 5 },
+    cost: { minerals: 8, science: 3 },
     maintenance: { energy: 2 },
-    production: { credits: 6 },
+    production: { science: 2 },
     maxLevel: 3,
     techRequired: null,
     terrainRestrictions: ['highRadiation', 'lavaField'],
@@ -135,9 +180,9 @@ export const BUILDINGS = {
     terrainRestrictions: [],
   },
   spaceport: {
-    cost: { minerals: 20, energy: 10, credits: 15, science: 5 },
-    maintenance: { energy: 5, credits: 3 },
-    production: { credits: 8, science: 2 },
+    cost: { minerals: 20, energy: 10, science: 10 },
+    maintenance: { energy: 5 },
+    production: { science: 3 },
     maxLevel: 2,
     techRequired: 'orbitalTransport',
     terrainRestrictions: ['mountain', 'canyon', 'lavaField'],
@@ -152,106 +197,113 @@ export const BUILDINGS = {
   },
 };
 
-// ============ TECH TREE ============
+// Junior-mode subset of buildings
+export const JUNIOR_BUILDINGS = ['habitat', 'solarFarm', 'waterExtractor', 'greenhouse', 'mine'];
+
+// ============ SENIOR TECH TREE ============
+// labRequired: null = no lab needed, 1 = researchLab needed, 2 = advancedResearchLab needed
 export const TECH_TREE = {
   // Survival
-  improvedLifeSupport: { branch: 'survival', cost: { science: 8 }, prerequisites: [], unlocks: [] },
-  waterRecycling: { branch: 'survival', cost: { science: 10 }, prerequisites: ['improvedLifeSupport'], unlocks: [] },
-  radiationProtection: { branch: 'survival', cost: { science: 12 }, prerequisites: ['improvedLifeSupport'], unlocks: ['radiationShelter'] },
-  medicalSystems: { branch: 'survival', cost: { science: 14 }, prerequisites: ['waterRecycling'], unlocks: ['medicalCenter'] },
-  closedLoopHabitats: { branch: 'survival', cost: { science: 25 }, prerequisites: ['waterRecycling', 'medicalSystems'], unlocks: [] },
+  improvedLifeSupport: { branch: 'survival', cost: { science: 6 }, prerequisites: [], labRequired: null, effect: { moraleBonus: 5 }, effectDesc: 'Colony morale +5 permanently.', effectDescKo: '식민지 사기 +5 영구 적용.' },
+  waterRecycling:      { branch: 'survival', cost: { science: 8 }, prerequisites: ['improvedLifeSupport'], labRequired: 1, effect: { building: 'waterExtractor', resourceBonus: { water: 2 } }, effectDesc: 'Water Extractors produce +2 Water.', effectDescKo: '물 추출 시설이 물 +2 생산.' },
+  radiationProtection: { branch: 'survival', cost: { science: 10 }, prerequisites: ['improvedLifeSupport'], labRequired: 1, unlocks: ['radiationShelter'], effect: { eventProtection: true }, effectDesc: 'Unlocks Radiation Shelter. Colony protected from radiation events.', effectDescKo: '방사선 대피소 해금. 방사선 이벤트 보호.' },
+  medicalSystems:      { branch: 'survival', cost: { science: 12 }, prerequisites: ['waterRecycling'], labRequired: 1, unlocks: ['medicalCenter'], effect: { populationBonus: 5 }, effectDesc: 'Unlocks Medical Center. Population +5.', effectDescKo: '의료 센터 해금. 인구 +5.' },
+  closedLoopHabitats:  { branch: 'survival', cost: { science: 22 }, prerequisites: ['waterRecycling', 'medicalSystems'], labRequired: 2, effect: { sustainabilityScore: 50 }, effectDesc: 'Sustainability score +50. Colony is self-sufficient.', effectDescKo: '지속가능성 점수 +50. 식민지 자급자족.' },
   // Energy
-  advancedSolar: { branch: 'energy', cost: { science: 8 }, prerequisites: [], unlocks: [] },
-  energyStorage: { branch: 'energy', cost: { science: 10 }, prerequisites: ['advancedSolar'], unlocks: [] },
-  smallNuclear: { branch: 'energy', cost: { science: 18 }, prerequisites: ['energyStorage'], unlocks: ['nuclearReactor'] },
-  fusionResearch: { branch: 'energy', cost: { science: 35 }, prerequisites: ['smallNuclear'], unlocks: [] },
+  advancedSolar:  { branch: 'energy', cost: { science: 6 }, prerequisites: [], labRequired: null, effect: { building: 'solarFarm', resourceBonus: { energy: 2 } }, effectDesc: 'Solar Farms produce +2 Energy.', effectDescKo: '태양광 발전소 에너지 +2 생산.' },
+  energyStorage:  { branch: 'energy', cost: { science: 8 }, prerequisites: ['advancedSolar'], labRequired: 1, effect: { energyCarryover: true }, effectDesc: 'Unused Energy carries over between turns.', effectDescKo: '미사용 에너지가 턴 사이에 이월됩니다.' },
+  smallNuclear:   { branch: 'energy', cost: { science: 16 }, prerequisites: ['energyStorage'], labRequired: 1, unlocks: ['nuclearReactor'], effect: {}, effectDesc: 'Unlocks Nuclear Reactor building.', effectDescKo: '원자로 건물 해금.' },
+  fusionResearch: { branch: 'energy', cost: { science: 30 }, prerequisites: ['smallNuclear'], labRequired: 2, effect: { scienceBonus: 10 }, effectDesc: 'Science production +10. Breakthrough achievement.', effectDescKo: '과학 생산 +10. 획기적인 업적.' },
   // Agriculture
-  soilTreatment: { branch: 'agriculture', cost: { science: 8 }, prerequisites: [], unlocks: [] },
-  hydroponics: { branch: 'agriculture', cost: { science: 12 }, prerequisites: ['soilTreatment'], unlocks: ['algaeFarm'] },
-  adaptedCrops: { branch: 'agriculture', cost: { science: 16 }, prerequisites: ['hydroponics'], unlocks: [] },
-  autoFood: { branch: 'agriculture', cost: { science: 22 }, prerequisites: ['adaptedCrops'], unlocks: [] },
+  soilTreatment: { branch: 'agriculture', cost: { science: 6 }, prerequisites: [], labRequired: null, effect: { building: 'greenhouse', resourceBonus: { food: 1 } }, effectDesc: 'Greenhouses produce +1 Food.', effectDescKo: '온실 식량 +1 생산.' },
+  hydroponics:   { branch: 'agriculture', cost: { science: 10 }, prerequisites: ['soilTreatment'], labRequired: 1, unlocks: ['algaeFarm'], effect: { building: 'greenhouse', resourceBonus: { food: 2 } }, effectDesc: 'Unlocks Algae Farm. Greenhouses +2 Food.', effectDescKo: '조류 농장 해금. 온실 식량 +2.' },
+  adaptedCrops:  { branch: 'agriculture', cost: { science: 14 }, prerequisites: ['hydroponics'], labRequired: 1, effect: { building: 'greenhouse', resourceBonus: { food: 2, oxygen: 1 } }, effectDesc: 'Greenhouses +2 Food +1 Oxygen.', effectDescKo: '온실 식량 +2, 산소 +1.' },
+  autoFood:      { branch: 'agriculture', cost: { science: 20 }, prerequisites: ['adaptedCrops'], labRequired: 2, effect: { maintenanceReduction: { water: 1 } }, effectDesc: 'Farm maintenance -1 Water per turn.', effectDescKo: '농장 유지비 물 -1 감소.' },
   // Industry
-  advancedMining: { branch: 'industry', cost: { science: 10 }, prerequisites: [], unlocks: [] },
-  manufacturing: { branch: 'industry', cost: { science: 14 }, prerequisites: ['advancedMining'], unlocks: ['factory'] },
-  robotics: { branch: 'industry', cost: { science: 20 }, prerequisites: ['manufacturing'], unlocks: [] },
-  printedHabitats: { branch: 'industry', cost: { science: 25 }, prerequisites: ['robotics'], unlocks: ['advancedHabitat'] },
+  advancedMining: { branch: 'industry', cost: { science: 8 }, prerequisites: [], labRequired: null, effect: { building: 'mine', resourceBonus: { minerals: 2 } }, effectDesc: 'Mines produce +2 Minerals.', effectDescKo: '광산 광물 +2 생산.' },
+  manufacturing:  { branch: 'industry', cost: { science: 12 }, prerequisites: ['advancedMining'], labRequired: 1, unlocks: ['factory'], effect: {}, effectDesc: 'Unlocks Factory building.', effectDescKo: '공장 건물 해금.' },
+  robotics:       { branch: 'industry', cost: { science: 18 }, prerequisites: ['manufacturing'], labRequired: 1, unlocks: ['advancedResearchLab'], effect: { buildCostReduction: 0.1 }, effectDesc: 'Unlocks Advanced Research Lab. Building costs -10%.', effectDescKo: '고급 연구소 해금. 건설 비용 -10%.' },
+  printedHabitats:{ branch: 'industry', cost: { science: 22 }, prerequisites: ['robotics'], labRequired: 2, unlocks: ['advancedHabitat'], effect: {}, effectDesc: 'Unlocks Advanced Habitat.', effectDescKo: '고급 거주지 해금.' },
   // Transportation
-  longRangeRovers: { branch: 'transportation', cost: { science: 8 }, prerequisites: [], unlocks: [] },
-  pressurizedRoads: { branch: 'transportation', cost: { science: 12 }, prerequisites: ['longRangeRovers'], unlocks: [] },
-  railways: { branch: 'transportation', cost: { science: 20 }, prerequisites: ['pressurizedRoads'], unlocks: [] },
-  orbitalTransport: { branch: 'transportation', cost: { science: 30 }, prerequisites: ['railways'], unlocks: ['spaceport'] },
+  longRangeRovers:   { branch: 'transportation', cost: { science: 6 }, prerequisites: [], labRequired: null, effect: { exploreRange: 2 }, effectDesc: 'Explore 2 hexes away from owned territory.', effectDescKo: '소유 영토에서 2칸 거리까지 탐사 가능.' },
+  pressurizedRoads:  { branch: 'transportation', cost: { science: 10 }, prerequisites: ['longRangeRovers'], labRequired: 1, effect: { claimCostReduction: 1 }, effectDesc: 'Claiming territory costs 1 fewer Energy.', effectDescKo: '영토 점령 에너지 비용 -1.' },
+  railways:          { branch: 'transportation', cost: { science: 18 }, prerequisites: ['pressurizedRoads'], labRequired: 1, effect: { territoryScore: 5 }, effectDesc: 'Territory score +5 for each connected hex.', effectDescKo: '연결된 헥스마다 영토 점수 +5.' },
+  orbitalTransport:  { branch: 'transportation', cost: { science: 28 }, prerequisites: ['railways'], labRequired: 2, unlocks: ['spaceport'], effect: {}, effectDesc: 'Unlocks Spaceport.', effectDescKo: '우주항 해금.' },
   // Society
-  education: { branch: 'society', cost: { science: 8 }, prerequisites: [], unlocks: [] },
-  publicHealth: { branch: 'society', cost: { science: 10 }, prerequisites: ['education'], unlocks: [] },
-  democracy: { branch: 'society', cost: { science: 14 }, prerequisites: ['publicHealth'], unlocks: [] },
-  recreation: { branch: 'society', cost: { science: 12 }, prerequisites: ['education'], unlocks: ['recreationCenter'] },
-  governance: { branch: 'society', cost: { science: 22 }, prerequisites: ['democracy', 'recreation'], unlocks: [] },
+  education:   { branch: 'society', cost: { science: 6 }, prerequisites: [], labRequired: null, effect: { scienceBonus: 2 }, effectDesc: 'Science production +2 per turn.', effectDescKo: '과학 생산 턴당 +2.' },
+  publicHealth: { branch: 'society', cost: { science: 8 }, prerequisites: ['education'], labRequired: 1, effect: { moraleBonus: 10 }, effectDesc: 'Colony morale +10.', effectDescKo: '식민지 사기 +10.' },
+  democracy:    { branch: 'society', cost: { science: 12 }, prerequisites: ['publicHealth'], labRequired: 1, effect: { cooperationBonus: 10 }, effectDesc: 'Cooperation score +10.', effectDescKo: '협력 점수 +10.' },
+  recreation:   { branch: 'society', cost: { science: 10 }, prerequisites: ['education'], labRequired: 1, unlocks: ['recreationCenter'], effect: { moraleBonus: 5 }, effectDesc: 'Unlocks Recreation Center. Morale +5.', effectDescKo: '여가 시설 해금. 사기 +5.' },
+  governance:   { branch: 'society', cost: { science: 20 }, prerequisites: ['democracy', 'recreation'], labRequired: 2, effect: { actionPointBonus: 1 }, effectDesc: '+1 Action Point per turn.', effectDescKo: '턴당 행동력 +1.' },
   // Planetary Science
-  geologicalSurveys: { branch: 'planetaryScience', cost: { science: 8 }, prerequisites: [], unlocks: [] },
-  climateResearch: { branch: 'planetaryScience', cost: { science: 12 }, prerequisites: ['geologicalSurveys'], unlocks: [] },
-  undergroundExploration: { branch: 'planetaryScience', cost: { science: 16 }, prerequisites: ['geologicalSurveys'], unlocks: [] },
-  terraforming: { branch: 'planetaryScience', cost: { science: 40 }, prerequisites: ['climateResearch', 'undergroundExploration'], unlocks: [] },
+  geologicalSurveys:     { branch: 'planetaryScience', cost: { science: 6 }, prerequisites: [], labRequired: null, effect: { building: 'mine', resourceBonus: { minerals: 1 } }, effectDesc: 'Mines produce +1 Minerals. Better deposits visible.', effectDescKo: '광산 광물 +1. 더 나은 매장지 표시.' },
+  climateResearch:       { branch: 'planetaryScience', cost: { science: 10 }, prerequisites: ['geologicalSurveys'], labRequired: 1, effect: { eventReduction: 0.5 }, effectDesc: 'Negative event effects reduced by 50%.', effectDescKo: '부정적 이벤트 효과 50% 감소.' },
+  undergroundExploration:{ branch: 'planetaryScience', cost: { science: 14 }, prerequisites: ['geologicalSurveys'], labRequired: 1, effect: { building: 'mine', resourceBonus: { minerals: 2, water: 1 } }, effectDesc: 'Mines produce +2 Minerals +1 Water.', effectDescKo: '광산 광물 +2, 물 +1.' },
+  terraforming:          { branch: 'planetaryScience', cost: { science: 38 }, prerequisites: ['climateResearch', 'undergroundExploration'], labRequired: 2, effect: { oxygenBonus: 10, sustainabilityScore: 100 }, effectDesc: 'Oxygen +10. Sustainability +100. Terraforming victory!', effectDescKo: '산소 +10. 지속가능성 +100. 테라포밍 승리!' },
 };
 
 // ============ EVENTS ============
 export const EVENTS = [
-  { id: 'dustStorm', type: 'negative', scope: 'single', effects: { energy: -3 } },
-  { id: 'solarStorm', type: 'negative', scope: 'all', effects: { morale: -2, population: -1 } },
-  { id: 'equipmentFailure', type: 'negative', scope: 'single', effects: { credits: -5, minerals: -2 } },
-  { id: 'waterContamination', type: 'negative', scope: 'single', effects: { water: -4 } },
-  { id: 'cropDisease', type: 'negative', scope: 'single', effects: { food: -3 } },
-  { id: 'medicalEmergency', type: 'negative', scope: 'single', effects: { morale: -3, population: -2 } },
-  { id: 'meteorStrike', type: 'negative', scope: 'single', effects: { minerals: -3, energy: -2 } },
-  { id: 'supplyDelay', type: 'negative', scope: 'all', effects: { credits: -2 } },
-  { id: 'earthFunding', type: 'positive', scope: 'single', effects: { credits: 10 } },
-  { id: 'iceDiscovery', type: 'positive', scope: 'single', effects: { water: 8 } },
-  { id: 'scienceDiscovery', type: 'positive', scope: 'single', effects: { science: 8 } },
-  { id: 'colonistProtest', type: 'negative', scope: 'single', effects: { morale: -5 } },
-  { id: 'populationBoom', type: 'positive', scope: 'single', effects: { population: 5 } },
-  { id: 'dispute', type: 'negative', scope: 'all', effects: { morale: -1, credits: -1 } },
-  { id: 'commsFailure', type: 'negative', scope: 'single', effects: { credits: -2 } },
+  { id: 'dustStorm',        type: 'negative', scope: 'single', effects: { energy: -3 } },
+  { id: 'solarStorm',       type: 'negative', scope: 'all',    effects: { morale: -2 } },
+  { id: 'equipmentFailure', type: 'negative', scope: 'single', effects: { minerals: -3 } },
+  { id: 'waterContamination',type:'negative', scope: 'single', effects: { water: -4 } },
+  { id: 'cropDisease',      type: 'negative', scope: 'single', effects: { food: -3 } },
+  { id: 'meteorStrike',     type: 'negative', scope: 'single', effects: { minerals: -2, energy: -2 } },
+  { id: 'supplyDelay',      type: 'negative', scope: 'all',    effects: { science: -1 } },
+  { id: 'iceDiscovery',     type: 'positive', scope: 'single', effects: { water: 6 } },
+  { id: 'scienceDiscovery', type: 'positive', scope: 'single', effects: { science: 5 } },
+  { id: 'populationBoom',   type: 'positive', scope: 'single', effects: { food: 3, minerals: 2 } },
+];
+
+// Junior events (simpler, with choice)
+export const JUNIOR_EVENTS = [
+  { id: 'dustStorm',        type: 'negative', scope: 'single', effects: { energy: -3 }, choice: true },
+  { id: 'waterContamination',type:'negative', scope: 'single', effects: { water: -4 }, choice: true },
+  { id: 'cropDisease',      type: 'negative', scope: 'single', effects: { food: -3 }, choice: true },
+  { id: 'iceDiscovery',     type: 'positive', scope: 'single', effects: { water: 6 } },
+  { id: 'populationBoom',   type: 'positive', scope: 'single', effects: { minerals: 4 } },
 ];
 
 // ============ FLAG EMBLEMS ============
 export const FLAG_EMBLEMS = [
-  '🚀', '⭐', '🌟', '🔴', '🌕', '🛸', '🔬', '⚙️', '🏔️', '🌊',
-  '🔥', '💫', '🪐', '☀️', '🌍', '🦅', '🐉', '🦁', '🌿', '⚡',
-  '🏛️', '🗡️', '🛡️', '👑', '🎯', '💎', '🔱', '⚓', '🌸', '🍀'
+  '🚀','⭐','🌟','🔴','🌕','🛸','🔬','⚙️','🏔️','🌊',
+  '🔥','💫','🪐','☀️','🌍','🦅','🐉','🦁','🌿','⚡',
+  '🏛️','🗡️','🛡️','👑','🎯','💎','🔱','⚓','🌸','🍀'
 ];
 
 // ============ NATION COLORS ============
 export const NATION_COLORS = [
-  { name: 'Blue', hex: '#3B82F6' },
-  { name: 'Red', hex: '#EF4444' },
-  { name: 'Green', hex: '#22C55E' },
+  { name: 'Blue',   hex: '#3B82F6' },
+  { name: 'Red',    hex: '#EF4444' },
+  { name: 'Green',  hex: '#22C55E' },
   { name: 'Purple', hex: '#A855F7' },
   { name: 'Orange', hex: '#F97316' },
-  { name: 'Cyan', hex: '#06B6D4' },
-  { name: 'Pink', hex: '#EC4899' },
+  { name: 'Cyan',   hex: '#06B6D4' },
+  { name: 'Pink',   hex: '#EC4899' },
   { name: 'Yellow', hex: '#EAB308' },
 ];
 
 // ============ STARTING RESOURCES ============
 export const STARTING_RESOURCES = {
-  scarce: { energy: 10, water: 8, food: 8, minerals: 8, science: 3, credits: 5, population: 10, morale: 50, oxygen: 10 },
-  standard: { energy: 15, water: 12, food: 12, minerals: 12, science: 5, credits: 10, population: 20, morale: 60, oxygen: 15 },
-  abundant: { energy: 25, water: 20, food: 20, minerals: 20, science: 10, credits: 20, population: 30, morale: 70, oxygen: 25 },
+  scarce:   { energy: 10, water: 8,  food: 8,  minerals: 8,  science: 2  },
+  standard: { energy: 15, water: 12, food: 12, minerals: 12, science: 5  },
+  abundant: { energy: 20, water: 16, food: 16, minerals: 16, science: 8  },
 };
 
 // ============ MAP GENERATION ============
 export function generateHexMap(size) {
-  const hexes = {};
   let radius;
-  if (size === 'small') radius = 5;
+  if (size === 'small')  radius = 5;
   else if (size === 'medium') radius = 7;
   else radius = 9;
 
-  const terrainKeys = Object.keys(TERRAIN_TYPES);
+  const hexes = {};
   const weightedTerrain = [
-    'rockyPlain', 'rockyPlain', 'rockyPlain', 'rockyPlain',
-    'dustBasin', 'dustBasin', 'dustBasin',
-    'crater', 'crater',
-    'mountain', 'mountain',
+    'rockyPlain','rockyPlain','rockyPlain','rockyPlain',
+    'dustBasin','dustBasin','dustBasin',
+    'crater','crater',
+    'mountain','mountain',
     'canyon',
     'iceDeposit',
     'mineralDeposit',
@@ -265,24 +317,10 @@ export function generateHexMap(size) {
       if (Math.abs(s) > radius) continue;
       const dist = Math.max(Math.abs(q), Math.abs(r), Math.abs(s));
       if (dist > radius) continue;
-
       let terrain;
-      if (dist >= radius - 1 && Math.random() < 0.4) {
-        terrain = 'polarIce';
-      } else {
-        terrain = weightedTerrain[Math.floor(Math.random() * weightedTerrain.length)];
-      }
-
-      const key = `${q},${r}`;
-      hexes[key] = {
-        q, r,
-        terrain,
-        explored: false,
-        owner: null,
-        buildings: [],
-        settlement: null,
-        isCapital: false,
-      };
+      if (dist >= radius - 1 && Math.random() < 0.4) terrain = 'polarIce';
+      else terrain = weightedTerrain[Math.floor(Math.random() * weightedTerrain.length)];
+      hexes[`${q},${r}`] = { q, r, terrain, explored: false, owner: null, buildings: [], settlement: null, isCapital: false };
     }
   }
   return { hexes, radius };
@@ -290,27 +328,21 @@ export function generateHexMap(size) {
 
 // ============ HEX GEOMETRY (flat-top) ============
 export function hexToPixel(q, r, size) {
-  const x = size * (3/2 * q);
-  const y = size * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
-  return { x, y };
+  return {
+    x: size * (3/2 * q),
+    y: size * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r),
+  };
 }
 
 export function pixelToHex(px, py, size) {
-  const q = (2/3 * px) / size;
-  const r = (-1/3 * px + Math.sqrt(3)/3 * py) / size;
-  return hexRound(q, r);
+  return hexRound((2/3 * px) / size, (-1/3 * px + Math.sqrt(3)/3 * py) / size);
 }
 
 function hexRound(qf, rf) {
   const sf = -qf - rf;
-  let q = Math.round(qf);
-  let r = Math.round(rf);
-  let s = Math.round(sf);
-  const qd = Math.abs(q - qf);
-  const rd = Math.abs(r - rf);
-  const sd = Math.abs(s - sf);
-  if (qd > rd && qd > sd) q = -r - s;
-  else if (rd > sd) r = -q - s;
+  let q = Math.round(qf), r = Math.round(rf), s = Math.round(sf);
+  if (Math.abs(q - qf) > Math.abs(r - rf) && Math.abs(q - qf) > Math.abs(s - sf)) q = -r - s;
+  else if (Math.abs(r - rf) > Math.abs(s - sf)) r = -q - s;
   return { q, r };
 }
 
@@ -318,36 +350,133 @@ export function getHexCorners(cx, cy, size) {
   const corners = [];
   for (let i = 0; i < 6; i++) {
     const angle = (Math.PI / 180) * (60 * i);
-    corners.push({
-      x: cx + size * Math.cos(angle),
-      y: cy + size * Math.sin(angle),
-    });
+    corners.push({ x: cx + size * Math.cos(angle), y: cy + size * Math.sin(angle) });
   }
   return corners;
 }
 
 export function getHexNeighbors(q, r) {
   return [
-    { q: q+1, r: r }, { q: q-1, r: r },
-    { q: q, r: r+1 }, { q: q, r: r-1 },
+    { q: q+1, r }, { q: q-1, r },
+    { q, r: r+1 }, { q, r: r-1 },
     { q: q+1, r: r-1 }, { q: q-1, r: r+1 },
   ];
 }
 
-// ============ GAME STATE HELPERS ============
+export function hexDistance(q1, r1, q2, r2) {
+  return (Math.abs(q1 - q2) + Math.abs(q1+r1 - q2-r2) + Math.abs(r1 - r2)) / 2;
+}
+
+// ============ RESOURCE CALCULATIONS ============
+// Get lab level a player has (0 = module only, 1 = researchLab, 2 = advancedResearchLab)
+export function getPlayerLabLevel(player, map) {
+  let level = 0;
+  if (!player || !map) return level;
+  Object.values(map.hexes).forEach(hex => {
+    if (hex.owner !== player.index) return;
+    if (hex.buildings.includes('advancedResearchLab')) level = Math.max(level, 2);
+    else if (hex.buildings.includes('researchLab')) level = Math.max(level, 1);
+  });
+  return level;
+}
+
+export function calculateResourceProduction(player, map) {
+  const production = { energy: 0, water: 0, food: 0, minerals: 0, science: 0, oxygen: 0, morale: 0 };
+  if (!player || player.index === undefined || !map) return production;
+
+  // Base science from research module at capital
+  production.science += 1;
+
+  // Tech bonuses: collect building production bonuses from researched techs
+  const techBonuses = {}; // building -> { resource: amount }
+  const techTree = player.gradeMode === 'junior'
+    ? {} // junior uses JUNIOR_TECHS effects applied at production time via technologies array
+    : {};
+
+  Object.entries(map.hexes).forEach(([, hex]) => {
+    if (hex.owner !== player.index) return;
+    const terrain = TERRAIN_TYPES[hex.terrain];
+    production.water   += terrain.waterMod;
+    production.minerals+= terrain.mineralMod;
+    production.energy  += terrain.energyMod;
+
+    hex.buildings.forEach(bId => {
+      const b = BUILDINGS[bId];
+      if (!b || !b.production) return;
+      Object.entries(b.production).forEach(([res, amt]) => {
+        production[res] = (production[res] || 0) + amt;
+      });
+    });
+  });
+
+  // Technology bonuses are applied via applyTechEffects at research time
+  // Additional per-building bonuses stored on player.techBonuses: { buildingId: { resource: totalBonus } }
+  if (player.techBonuses) {
+    Object.entries(player.techBonuses).forEach(([buildingId, bonuses]) => {
+      let count = 0;
+      Object.values(map.hexes).forEach(h => {
+        if (h.owner === player.index && h.buildings.includes(buildingId)) count++;
+      });
+      if (count > 0) {
+        Object.entries(bonuses).forEach(([res, amt]) => {
+          production[res] = (production[res] || 0) + (amt * count);
+        });
+      }
+    });
+  }
+  // Flat science/morale bonuses from techs
+  if (player.flatBonuses) {
+    Object.entries(player.flatBonuses).forEach(([res, amt]) => {
+      production[res] = (production[res] || 0) + amt;
+    });
+  }
+
+  return production;
+}
+
+export function calculateMaintenance(player, map) {
+  const maintenance = { energy: 0, water: 0, food: 0, minerals: 0 };
+  if (!player || !map) return maintenance;
+  Object.entries(map.hexes).forEach(([, hex]) => {
+    if (hex.owner !== player.index) return;
+    hex.buildings.forEach(bId => {
+      const b = BUILDINGS[bId];
+      if (!b || !b.maintenance) return;
+      Object.entries(b.maintenance).forEach(([res, amt]) => {
+        maintenance[res] = (maintenance[res] || 0) + amt;
+      });
+    });
+  });
+  return maintenance;
+}
+
+export function calculateScores(player, map) {
+  let territory = 0;
+  Object.values(map.hexes).forEach(h => { if (h.owner === player.index) territory++; });
+  return {
+    territory,
+    science: (player.technologies || []).length * 5,
+    population: player.resources.population || 0,
+    livingConditions: 50,
+    economic: (player.resources.minerals || 0),
+    cooperation: (player.agreements || []).length * 10,
+    sustainability: player.technologies?.includes('closedLoopHabitats') ? 50 : 0,
+    achievement: (player.technologies || []).length * 2 + territory,
+  };
+}
+
+// ============ GAME STATE CREATION ============
 export function createInitialGameState(settings, nations) {
-  const gradeMode = settings.gradeMode || 'standard';
+  const gradeMode = settings.gradeMode || 'senior';
   const map = generateHexMap(settings.mapSize || 'medium');
-  
-  // Assign starting positions
-  const hexKeys = Object.keys(map.hexes).filter(k => {
+
+  const validHexKeys = Object.keys(map.hexes).filter(k => {
     const h = map.hexes[k];
     return h.terrain !== 'highRadiation' && h.terrain !== 'lavaField' && h.terrain !== 'polarIce';
   });
-  
-  // Pick spread-out starting positions
-  const startPositions = pickStartingPositions(hexKeys, nations.length, map);
-  
+
+  const startPositions = pickStartingPositions(validHexKeys, nations.length, map);
+
   const players = nations.map((nation, i) => {
     const hexKey = startPositions[i];
     const hex = map.hexes[hexKey];
@@ -355,41 +484,49 @@ export function createInitialGameState(settings, nations) {
     hex.owner = i;
     hex.isCapital = true;
     hex.settlement = { name: nation.colonyName, level: 1 };
-    hex.buildings = ['landingHabitat', 'solarFarm', 'waterExtractor', 'greenhouse', 'researchLab'];
-    
+
+    if (gradeMode === 'junior') {
+      hex.buildings = ['habitat', 'solarFarm', 'waterExtractor', 'greenhouse', 'researchModule'];
+    } else {
+      hex.buildings = ['landingHabitat', 'solarFarm', 'waterExtractor', 'greenhouse', 'researchModule'];
+    }
+
     // Explore neighbors
-    const neighbors = getHexNeighbors(hex.q, hex.r);
-    neighbors.forEach(n => {
+    getHexNeighbors(hex.q, hex.r).forEach(n => {
       const nk = `${n.q},${n.r}`;
-      if (map.hexes[nk]) {
-        map.hexes[nk].explored = true;
-      }
+      if (map.hexes[nk]) map.hexes[nk].explored = true;
     });
-    
+
     const resKey = settings.startingResources || 'standard';
     const res = { ...STARTING_RESOURCES[resKey] };
-    // Junior mode: only 4 resources with higher values
+
     if (gradeMode === 'junior') {
-      Object.keys(res).forEach(k => {
-        if (!['energy','water','food','minerals'].includes(k)) delete res[k];
-      });
-      res.energy = (res.energy || 15) + 5;
-      res.water = (res.water || 12) + 3;
-      res.food = (res.food || 12) + 3;
-      res.minerals = (res.minerals || 12) + 3;
+      // Junior: only 4 resources + small science for research
+      return {
+        ...nation,
+        index: i,
+        gradeMode,
+        resources: { energy: res.energy, water: res.water, food: res.food, minerals: res.minerals, science: 4 },
+        technologies: [],
+        agreements: [],
+        cooperationActions: 0,
+        scores: { territory: 1, science: 0, cooperation: 0, development: 0 },
+        capitalHex: hexKey,
+      };
     }
-    
+
     return {
       ...nation,
       index: i,
-      resources: res,
+      gradeMode,
+      resources: { ...res },
       technologies: [],
       agreements: [],
-      scores: { territory: 1, science: 0, population: res.population || 20, livingConditions: 50, economic: 0, cooperation: 0, sustainability: 0, achievement: 0 },
+      scores: { territory: 1, science: 0, population: res.population || 0, livingConditions: 50, economic: 0, cooperation: 0, sustainability: 0, achievement: 0 },
       capitalHex: hexKey,
     };
   });
-  
+
   return {
     settings: { ...settings, gradeMode },
     map,
@@ -406,132 +543,22 @@ export function createInitialGameState(settings, nations) {
 }
 
 function pickStartingPositions(hexKeys, count, map) {
-  // Try to pick positions that are spread apart
   const positions = [];
-  const tries = 100;
-  
-  for (let t = 0; t < tries && positions.length < count; t++) {
+  for (let t = 0; t < 200 && positions.length < count; t++) {
     const candidate = hexKeys[Math.floor(Math.random() * hexKeys.length)];
     const hex = map.hexes[candidate];
-    const dist = Math.max(Math.abs(hex.q), Math.abs(hex.r), Math.abs(-hex.q - hex.r));
-    
-    // Prefer positions not too close to edge and not too close to each other
+    const dist = Math.max(Math.abs(hex.q), Math.abs(hex.r), Math.abs(-hex.q-hex.r));
     if (dist > map.radius - 2) continue;
-    
     let tooClose = false;
     for (const pos of positions) {
       const ph = map.hexes[pos];
-      const d = hexDistance(hex.q, hex.r, ph.q, ph.r);
-      if (d < Math.max(3, Math.floor(map.radius * 0.6))) {
-        tooClose = true;
-        break;
-      }
+      if (hexDistance(hex.q, hex.r, ph.q, ph.r) < Math.max(3, Math.floor(map.radius * 0.5))) { tooClose = true; break; }
     }
     if (!tooClose) positions.push(candidate);
   }
-  
-  // Fallback if we didn't get enough
   while (positions.length < count) {
-    const candidate = hexKeys[Math.floor(Math.random() * hexKeys.length)];
-    if (!positions.includes(candidate)) positions.push(candidate);
+    const c = hexKeys[Math.floor(Math.random() * hexKeys.length)];
+    if (!positions.includes(c)) positions.push(c);
   }
-  
   return positions;
-}
-
-export function hexDistance(q1, r1, q2, r2) {
-  return (Math.abs(q1 - q2) + Math.abs(q1 + r1 - q2 - r2) + Math.abs(r1 - r2)) / 2;
-}
-
-export function calculateResourceProduction(player, map) {
-  const production = { energy: 0, water: 0, food: 0, minerals: 0, science: 0, credits: 0, oxygen: 0, morale: 0, population: 0 };
-  if (!player || player.index === undefined || !map) return production;
-  
-  Object.entries(map.hexes).forEach(([key, hex]) => {
-    if (hex.owner !== player.index) return;
-    
-    const terrainData = TERRAIN_TYPES[hex.terrain];
-    production.water += terrainData.waterMod;
-    production.minerals += terrainData.mineralMod;
-    production.energy += terrainData.energyMod;
-    
-    hex.buildings.forEach(bId => {
-      const bData = BUILDINGS[bId];
-      if (bData && bData.production) {
-        Object.entries(bData.production).forEach(([res, amt]) => {
-          production[res] = (production[res] || 0) + amt;
-        });
-      }
-    });
-  });
-  
-  return production;
-}
-
-export function calculateMaintenance(player, map) {
-  const maintenance = { energy: 0, water: 0, food: 0, minerals: 0, credits: 0 };
-  if (!player || player.index === undefined || !map) return maintenance;
-  
-  Object.entries(map.hexes).forEach(([key, hex]) => {
-    if (hex.owner !== player.index) return;
-    hex.buildings.forEach(bId => {
-      const bData = BUILDINGS[bId];
-      if (bData && bData.maintenance) {
-        Object.entries(bData.maintenance).forEach(([res, amt]) => {
-          maintenance[res] = (maintenance[res] || 0) + amt;
-        });
-      }
-    });
-  });
-  
-  // Population consumes food, water, oxygen
-  const pop = player.resources.population;
-  maintenance.food += Math.ceil(pop / 5);
-  maintenance.water += Math.ceil(pop / 8);
-  maintenance.oxygen = (maintenance.oxygen || 0) + Math.ceil(pop / 6);
-  
-  return maintenance;
-}
-
-export function calculateLivingConditions(player, map) {
-  const r = player.resources;
-  const pop = Math.max(r.population, 1);
-  
-  let housing = 0;
-  Object.entries(map.hexes).forEach(([key, hex]) => {
-    if (hex.owner !== player.index) return;
-    hex.buildings.forEach(b => {
-      if (b === 'landingHabitat') housing += 15;
-      if (b === 'advancedHabitat') housing += 40;
-    });
-  });
-  
-  const housingScore = Math.min(100, (housing / pop) * 100);
-  const foodScore = Math.min(100, (r.food / Math.max(1, Math.ceil(pop / 5))) * 50);
-  const waterScore = Math.min(100, (r.water / Math.max(1, Math.ceil(pop / 8))) * 50);
-  const oxygenScore = Math.min(100, (r.oxygen / Math.max(1, Math.ceil(pop / 6))) * 50);
-  const healthScore = player.technologies.includes('medicalSystems') ? 70 : 40;
-  const safetyScore = player.technologies.includes('radiationProtection') ? 70 : 40;
-  const educationScore = player.technologies.includes('education') ? 60 : 20;
-  const recreationScore = player.technologies.includes('recreation') ? 60 : 20;
-  const stabilityScore = r.morale > 50 ? 60 : 30;
-  const moraleScore = r.morale;
-  
-  return Math.round((housingScore + foodScore + waterScore + oxygenScore + healthScore + safetyScore + educationScore + recreationScore + stabilityScore + moraleScore) / 10);
-}
-
-export function calculateScores(player, map) {
-  let territory = 0;
-  Object.values(map.hexes).forEach(h => { if (h.owner === player.index) territory++; });
-  
-  return {
-    territory,
-    science: player.technologies.length * 5,
-    population: player.resources.population,
-    livingConditions: calculateLivingConditions(player, map),
-    economic: player.resources.credits + Math.floor(player.resources.minerals / 2),
-    cooperation: player.agreements.length * 10,
-    sustainability: player.technologies.includes('closedLoopHabitats') ? 50 : (player.technologies.includes('waterRecycling') ? 25 : 0),
-    achievement: player.technologies.length * 2 + territory,
-  };
 }

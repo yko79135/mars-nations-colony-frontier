@@ -13,41 +13,46 @@ import VictoryScreen from '@/components/game/VictoryScreen';
 
 function GameRouter() {
   const { screen, gameState } = useGame();
+  const isJunior = gameState?.settings?.gradeMode === 'junior';
 
   if (gameState?.gameOver && screen === 'playing') {
     return (
       <div className="h-screen flex flex-col">
         <TopNav />
-        <div className="flex-1 overflow-hidden">
-          <VictoryScreen />
-        </div>
+        <div className="flex-1 overflow-hidden"><VictoryScreen /></div>
       </div>
     );
   }
 
   if (screen === 'menu') return <MainMenu />;
-  if (screen === 'setup') return (
-    <>
+  if (screen === 'setup') return <><TopNav /><GameSetup /></>;
+  if (screen === 'nationCreation') return <><TopNav /><NationCreation /></>;
+  if (screen === 'victory') return (
+    <div className="h-screen flex flex-col">
       <TopNav />
-      <GameSetup />
-    </>
-  );
-  if (screen === 'nationCreation') return (
-    <>
-      <TopNav />
-      <NationCreation />
-    </>
+      <div className="flex-1 overflow-hidden"><VictoryScreen /></div>
+    </div>
   );
 
+  // Junior mode: only playing screen (no separate tech/diplomacy/rankings pages)
+  if (isJunior) {
+    return (
+      <div className="h-screen flex flex-col">
+        <TopNav />
+        <div className="flex-1 overflow-hidden"><GameScreen /></div>
+      </div>
+    );
+  }
+
+  // Senior mode: full navigation
   return (
     <div className="h-screen flex flex-col">
       <TopNav />
       <div className="flex-1 overflow-hidden">
-        {screen === 'playing' && <GameScreen />}
-        {screen === 'techTree' && <TechTree />}
+        {screen === 'playing'   && <GameScreen />}
+        {screen === 'techTree'  && <TechTree />}
         {screen === 'diplomacy' && <DiplomacyPanel />}
-        {screen === 'rankings' && <Rankings />}
-        {screen === 'victory' && <VictoryScreen />}
+        {screen === 'rankings'  && <Rankings />}
       </div>
     </div>
   );

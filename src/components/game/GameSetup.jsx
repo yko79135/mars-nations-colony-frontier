@@ -8,18 +8,17 @@ import { GRADE_MODES } from '@/lib/gameModes';
 export default function GameSetup() {
   const { t } = useLang();
   const { setScreen } = useGame();
-  
+
   const [settings, setSettings] = useState({
     playerCount: 2,
-    gradeMode: 'standard',
-    mapSize: 'medium',
-    gameLength: 20,
-    eventFrequency: 'normal',
-    startingResources: 'standard',
-    protectionPeriod: 3,
+    gradeMode: 'junior',
+    mapSize: 'small',
+    gameLength: 8,
+    eventFrequency: 'low',
+    startingResources: 'abundant',
+    protectionPeriod: 4,
     actionPointsPerTurn: 3,
     educationalMode: true,
-    tutorialMode: false,
   });
 
   const applyGradeMode = (modeKey) => {
@@ -47,9 +46,9 @@ export default function GameSetup() {
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-red-950 flex items-center justify-center p-4">
       <div className="max-w-lg w-full bg-gray-900/80 border border-gray-700 rounded-xl p-6">
         <h2 className="text-2xl font-display font-bold text-white mb-6">{t.setup.title}</h2>
-        
+
         <div className="mb-6">
-          <label className="text-gray-400 text-xs font-heading uppercase tracking-wider mb-2 block">Grade Mode / 학년 모드</label>
+          <label className="text-gray-400 text-xs font-heading uppercase tracking-wider mb-3 block">{t.setup.gradeMode}</label>
           <ModeSelector value={settings.gradeMode} onChange={applyGradeMode} />
         </div>
 
@@ -57,7 +56,7 @@ export default function GameSetup() {
           <div>
             <label className="text-gray-400 text-xs font-heading uppercase tracking-wider mb-1 block">{t.setup.players}</label>
             <div className="flex gap-2">
-              {[2,3,4,5,6].map(n => (
+              {[2, 3, 4, 5, 6].map(n => (
                 <button key={n} onClick={() => setSettings(s => ({ ...s, playerCount: n }))}
                   className={`w-10 h-10 rounded font-bold text-sm transition-colors ${settings.playerCount === n ? 'bg-orange-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
                   {n}
@@ -80,9 +79,9 @@ export default function GameSetup() {
 
           <div>
             <label className="text-gray-400 text-xs font-heading uppercase tracking-wider mb-1 block">
-              {t.setup.gameLength}: {settings.gameLength}
+              {t.setup.gameLength}: <span className="text-orange-400">{settings.gameLength}</span>
             </label>
-            <input type="range" min={5} max={50} step={5} value={settings.gameLength}
+            <input type="range" min={5} max={50} step={1} value={settings.gameLength}
               onChange={e => setSettings(s => ({ ...s, gameLength: parseInt(e.target.value) }))}
               className="w-full accent-orange-500" />
           </div>
@@ -109,21 +108,6 @@ export default function GameSetup() {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={settings.educationalMode}
-                onChange={e => setSettings(s => ({ ...s, educationalMode: e.target.checked }))}
-                className="accent-orange-500" />
-              <span className="text-gray-300 text-sm">{t.setup.educationalMode}</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={settings.tutorialMode}
-                onChange={e => setSettings(s => ({ ...s, tutorialMode: e.target.checked }))}
-                className="accent-orange-500" />
-              <span className="text-gray-300 text-sm">{t.setup.tutorialMode}</span>
-            </label>
           </div>
         </div>
 
