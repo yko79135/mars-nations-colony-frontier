@@ -336,7 +336,8 @@ export function getHexNeighbors(q, r) {
 
 // ============ GAME STATE HELPERS ============
 export function createInitialGameState(settings, nations) {
-  const map = generateHexMap(settings.mapSize);
+  const gradeMode = settings.gradeMode || 'standard';
+  const map = generateHexMap(settings.mapSize || 'medium');
   
   // Assign starting positions
   const hexKeys = Object.keys(map.hexes).filter(k => {
@@ -365,7 +366,18 @@ export function createInitialGameState(settings, nations) {
       }
     });
     
-    const res = { ...STARTING_RESOURCES[settings.startingResources] };
+    const resKey = settings.startingResources || 'standard';
+    const res = { ...STARTING_RESOURCES[resKey] };
+    // Junior mode: only 4 resources with higher values
+    if (gradeMode === 'junior') {
+      Object.keys(res).forEach(k => {
+        if (!['energy','water','food','minerals'].includes(k)) delete res[k];
+      });
+      res.energy = (res.energy || 15) + 5;
+      res.water = (res.water || 12) + 3;
+      res.food = (res.food || 12) + 3;
+      res.minerals = (res.minerals || 12) + 3;
+    }
     
     return {
       ...nation,
@@ -373,13 +385,13 @@ export function createInitialGameState(settings, nations) {
       resources: res,
       technologies: [],
       agreements: [],
-      scores: { territory: 1, science: 0, population: res.population, livingConditions: 50, economic: 0, cooperation: 0, sustainability: 0, achievement: 0 },
+      scores: { territory: 1, science: 0, population: res.population || 20, livingConditions: 50, economic: 0, cooperation: 0, sustainability: 0, achievement: 0 },
       capitalHex: hexKey,
     };
   });
   
   return {
-    settings,
+    settings: { ...settings, gradeMode },
     map,
     players,
     currentPlayerIndex: 0,
@@ -433,6 +445,7 @@ export function hexDistance(q1, r1, q2, r2) {
 
 export function calculateResourceProduction(player, map) {
   const production = { energy: 0, water: 0, food: 0, minerals: 0, science: 0, credits: 0, oxygen: 0, morale: 0, population: 0 };
+  if (!player || player.index === undefined || !map) return production;
   
   Object.entries(map.hexes).forEach(([key, hex]) => {
     if (hex.owner !== player.index) return;
@@ -457,6 +470,7 @@ export function calculateResourceProduction(player, map) {
 
 export function calculateMaintenance(player, map) {
   const maintenance = { energy: 0, water: 0, food: 0, minerals: 0, credits: 0 };
+  if (!player || player.index === undefined || !map) return maintenance;
   
   Object.entries(map.hexes).forEach(([key, hex]) => {
     if (hex.owner !== player.index) return;

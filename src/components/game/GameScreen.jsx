@@ -6,13 +6,14 @@ import LeftSidebar from './LeftSidebar';
 import HexInfoPanel from './HexInfoPanel';
 import EventModal from './EventModal';
 import SaveLoadModal from './SaveLoadModal';
+import MapLegend from './MapLegend';
 import { Save } from 'lucide-react';
 
 export default function GameScreen() {
   const { gameState } = useGame();
   const { t } = useLang();
   const [selectedHex, setSelectedHex] = useState(null);
-  const [actionMode, setActionMode] = useState(null); // explore, claim, build, research
+  const [actionMode, setActionMode] = useState(null);
   const [showSave, setShowSave] = useState(false);
 
   if (!gameState) return null;
@@ -23,37 +24,24 @@ export default function GameScreen() {
 
   const handleHexSelect = (key) => {
     setSelectedHex(key);
-    
-    // If in explore mode and hex is unexplored, auto-explore
-    if (actionMode === 'explore') {
-      const hex = gameState.map.hexes[key];
-      if (hex && !hex.explored) {
-        // Will be handled by HexInfoPanel
-      }
-    }
   };
 
   return (
     <div className="flex h-[calc(100vh-48px)] bg-gray-950 overflow-hidden">
       {/* Left sidebar */}
-      <LeftSidebar onAction={handleAction} />
-      
+      <LeftSidebar onAction={handleAction} actionMode={actionMode} />
+
       {/* Main map area */}
       <div className="flex-1 relative">
-        {/* Action mode indicator */}
+        {/* Action mode banner */}
         {actionMode && (
-          <div className="absolute top-3 left-3 z-10 px-3 py-1.5 bg-gray-800/90 border border-gray-600 rounded-lg text-xs text-white flex items-center gap-2">
+          <div className="absolute top-3 left-3 z-10 px-3 py-1.5 bg-gray-800/95 border border-orange-500/50 rounded-lg text-xs text-white flex items-center gap-2 shadow-lg">
             <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-            {actionMode === 'explore' && `🔭 ${t.actions.explore}: ${t.general.selectHex}`}
-            {actionMode === 'claim' && `🏴 ${t.actions.claim}: ${t.general.selectHex}`}
-            {actionMode === 'build' && `🏗️ ${t.actions.build}: ${t.general.selectHex}`}
-            {actionMode === 'research' && `🔬 ${t.actions.research}`}
-            <button
-              onClick={() => setActionMode(null)}
-              className="text-gray-400 hover:text-white ml-1"
-            >
-              ✕
-            </button>
+            {actionMode === 'explore' && `🔭 ${t.actions.explore} — ${t.general.selectHex}`}
+            {actionMode === 'claim'   && `🏴 ${t.actions.claim} — ${t.general.selectHex}`}
+            {actionMode === 'build'   && `🏗️ ${t.actions.build} — ${t.general.selectHex}`}
+            {actionMode === 'research'&& `🔬 ${t.actions.research} — ${t.general.selectHex}`}
+            <button onClick={() => setActionMode(null)} className="text-gray-400 hover:text-white ml-1">✕</button>
           </div>
         )}
 
@@ -65,7 +53,8 @@ export default function GameScreen() {
           <Save size={16} />
         </button>
 
-        <HexMap onHexSelect={handleHexSelect} selectedHex={selectedHex} />
+        <HexMap onHexSelect={handleHexSelect} selectedHex={selectedHex} actionMode={actionMode} />
+        <MapLegend />
       </div>
 
       {/* Right info panel */}
@@ -74,13 +63,11 @@ export default function GameScreen() {
           hexKey={selectedHex}
           onClose={() => setSelectedHex(null)}
           actionMode={actionMode}
+          onClearAction={() => setActionMode(null)}
         />
       )}
 
-      {/* Event modal */}
       <EventModal />
-      
-      {/* Save/Load modal */}
       <SaveLoadModal isOpen={showSave} onClose={() => setShowSave(false)} />
     </div>
   );

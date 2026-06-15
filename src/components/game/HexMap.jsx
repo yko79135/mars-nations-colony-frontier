@@ -1,36 +1,61 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useGame } from '@/lib/gameContext';
 import { useLang } from '@/lib/i18n';
-import { TERRAIN_TYPES, hexToPixel, getHexCorners } from '@/lib/gameData';
-import { ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react';
+import { TERRAIN_TYPES, hexToPixel, getHexCorners, getHexNeighbors } from '@/lib/gameData';
+import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
 const HEX_SIZE = 30;
 
 function getTerrainFill(terrain, explored) {
-  if (!explored) return '#1a1a2e';
+  if (!explored) return '#111827';
   return TERRAIN_TYPES[terrain]?.color || '#444';
 }
 
-function getTerrainPattern(terrain) {
-  if (!TERRAIN_TYPES[terrain]) return null;
-  return TERRAIN_TYPES[terrain].icon;
-}
-
-export default function HexMap({ onHexSelect, selectedHex }) {
+export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
   const { gameState } = useGame();
   const { t } = useLang();
   const svgRef = useRef(null);
   const containerRef = useRef(null);
-  
+
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 800, h: 600 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
 
   const map = gameState?.map;
-  const hexes = map ? Object.entries(map.hexes) : [];
+  const players = gameState?.players || [];
+  const currentPlayer = gameState ? gameState.players[gameState.currentPlayerIndex] : null;
 
-  // Calculate initial viewbox to fit map
+  // Compute valid action tiles for highlighting
+  const validTiles = useMemo(() => {
+    if (!map || !gameState || !actionMode) return new Set();
+    const valid = new Set();
+    const pidx = gameState.currentPlayerIndex;
+
+    Object.entries(map.hexes).forEach(([key, hex]) => {
+      if (actionMode === 'explore' && !hex.explored) {
+        // Must be adjacent to owned or explored territory
+        const neighbors = getHexNeighbors(hex.q, hex.r);
+        const hasAdj = neighbors.some(n => {
+          const nk = `${n.q},${n.r}`;
+          return map.hexes[nk] && (map.hexes[nk].owner === pidx || map.hexes[nk].explored);
+        });
+        if (hasAdj) valid.add(key);
+      }
+      if (actionMode === 'claim' && hex.explored && hex.owner === null) {
+        const neighbors = getHexNeighbors(hex.q, hex.r);
+        const hasAdj = neighbors.some(n => {
+          const nk = `${n.q},${n.r}`;
+          return map.hexes[nk] && map.hexes[nk].owner === pidx;
+        });
+        if (hasAdj) valid.add(key);
+      }
+      if (actionMode === 'build' && hex.owner === pidx) {
+        valid.add(key);
+      }
+    });
+    return valid;
+  }, [map, gameState, actionMode]);
+
   const resetView = useCallback(() => {
     if (!map) return;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -48,12 +73,10 @@ export default function HexMap({ onHexSelect, selectedHex }) {
       w: (maxX - minX) + padding * 2,
       h: (maxY - minY) + padding * 2,
     });
-    setZoom(1);
   }, [map]);
 
   useEffect(() => { resetView(); }, [resetView]);
 
-  // Attach wheel listener via ref to use { passive: false }
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -74,9 +97,7 @@ export default function HexMap({ onHexSelect, selectedHex }) {
       const cy = prev.y + prev.h / 2;
       return { x: cx - newW / 2, y: cy - newH / 2, w: newW, h: newH };
     });
-    setZoom(z => dir > 0 ? z * 1.25 : z * 0.8);
   };
-
 
   const handleMouseDown = (e) => {
     if (e.button === 0 || e.button === 1) {
@@ -86,21 +107,15 @@ export default function HexMap({ onHexSelect, selectedHex }) {
   };
 
   const handleMouseMove = (e) => {
-    if (!isPanning) return;
+    if (!isPanning || !containerRef.current) return;
     const dx = (e.clientX - panStart.x) * (viewBox.w / containerRef.current.clientWidth);
     const dy = (e.clientY - panStart.y) * (viewBox.h / containerRef.current.clientHeight);
     setViewBox(prev => ({ ...prev, x: prev.x - dx, y: prev.y - dy }));
     setPanStart({ x: e.clientX, y: e.clientY });
   };
 
-  const handleMouseUp = () => { setIsPanning(false); };
+  const handleMouseUp = () => setIsPanning(false);
 
-  const handleHexClick = (key, e) => {
-    e.stopPropagation();
-    onHexSelect(key);
-  };
-
-  // Touch handling
   const handleTouchStart = (e) => {
     if (e.touches.length === 1) {
       setIsPanning(true);
@@ -109,18 +124,18 @@ export default function HexMap({ onHexSelect, selectedHex }) {
   };
 
   const handleTouchMove = (e) => {
-    if (!isPanning || e.touches.length !== 1) return;
+    if (!isPanning || e.touches.length !== 1 || !containerRef.current) return;
     const dx = (e.touches[0].clientX - panStart.x) * (viewBox.w / containerRef.current.clientWidth);
     const dy = (e.touches[0].clientY - panStart.y) * (viewBox.h / containerRef.current.clientHeight);
     setViewBox(prev => ({ ...prev, x: prev.x - dx, y: prev.y - dy }));
     setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
   };
 
-  const handleTouchEnd = () => { setIsPanning(false); };
-
-  const players = gameState?.players || [];
+  const handleTouchEnd = () => setIsPanning(false);
 
   if (!map) return null;
+
+  const hexEntries = Object.entries(map.hexes);
 
   return (
     <div className="relative w-full h-full" ref={containerRef}>
@@ -139,9 +154,8 @@ export default function HexMap({ onHexSelect, selectedHex }) {
 
       <svg
         ref={svgRef}
-        className="w-full h-full cursor-grab active:cursor-grabbing"
+        className="w-full h-full cursor-grab active:cursor-grabbing select-none"
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -151,61 +165,66 @@ export default function HexMap({ onHexSelect, selectedHex }) {
         onTouchEnd={handleTouchEnd}
       >
         {/* Background */}
-        <rect x={viewBox.x - 1000} y={viewBox.y - 1000} width={viewBox.w + 2000} height={viewBox.h + 2000} fill="#0a0a1a" />
-        
-        {hexes.map(([key, hex]) => {
+        <rect x={viewBox.x - 1000} y={viewBox.y - 1000} width={viewBox.w + 2000} height={viewBox.h + 2000} fill="#060914" />
+
+        {hexEntries.map(([key, hex]) => {
           const { x, y } = hexToPixel(hex.q, hex.r, HEX_SIZE);
           const corners = getHexCorners(x, y, HEX_SIZE - 1);
           const points = corners.map(c => `${c.x},${c.y}`).join(' ');
           const fill = getTerrainFill(hex.terrain, hex.explored);
           const isSelected = selectedHex === key;
+          const isValid = validTiles.has(key);
           const ownerColor = hex.owner !== null && hex.owner !== undefined ? players[hex.owner]?.colorHex : null;
-          const icon = hex.explored ? getTerrainPattern(hex.terrain) : '?';
+          const icon = hex.explored ? (TERRAIN_TYPES[hex.terrain]?.icon || '?') : '?';
+
+          let strokeColor = '#1e2235';
+          let strokeWidth = 0.5;
+          if (isSelected) { strokeColor = '#ffffff'; strokeWidth = 2.5; }
+          else if (isValid) { strokeColor = actionMode === 'explore' ? '#60a5fa' : actionMode === 'claim' ? '#4ade80' : '#fbbf24'; strokeWidth = 2; }
+          else if (ownerColor) { strokeColor = ownerColor; strokeWidth = 2; }
 
           return (
-            <g key={key} onClick={(e) => handleHexClick(key, e)} className="cursor-pointer">
-              {/* Hex fill */}
+            <g key={key} onClick={(e) => { e.stopPropagation(); onHexSelect(key); }} className="cursor-pointer">
               <polygon
                 points={points}
                 fill={fill}
-                stroke={isSelected ? '#fff' : ownerColor || '#2a2a3a'}
-                strokeWidth={isSelected ? 2 : ownerColor ? 2.5 : 0.5}
-                opacity={hex.explored ? 1 : 0.4}
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                opacity={hex.explored ? 1 : 0.5}
               />
-              
-              {/* Owner overlay */}
+
+              {/* Owner color overlay */}
               {ownerColor && (
-                <polygon
-                  points={points}
-                  fill={ownerColor}
-                  opacity={0.2}
-                  stroke="none"
-                />
+                <polygon points={points} fill={ownerColor} opacity={0.18} stroke="none" />
+              )}
+
+              {/* Valid tile pulse overlay */}
+              {isValid && !isSelected && (
+                <polygon points={points} fill={
+                  actionMode === 'explore' ? '#3b82f6' :
+                  actionMode === 'claim' ? '#22c55e' : '#f59e0b'
+                } opacity={0.15} stroke="none" />
               )}
 
               {/* Terrain icon */}
               <text
                 x={x} y={y + 1}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize={hex.explored ? 11 : 8}
-                opacity={hex.explored ? 0.8 : 0.3}
+                textAnchor="middle" dominantBaseline="middle"
+                fontSize={hex.explored ? 11 : 9}
+                opacity={hex.explored ? 0.85 : 0.25}
                 style={{ pointerEvents: 'none' }}
               >
                 {icon}
               </text>
-              
+
               {/* Settlement marker */}
               {hex.settlement && (
                 <>
                   <circle cx={x} cy={y - HEX_SIZE * 0.35} r={6} fill={ownerColor || '#fff'} opacity={0.9} />
                   <text
                     x={x} y={y - HEX_SIZE * 0.35 + 1}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize={7}
-                    fill="#fff"
-                    fontWeight="bold"
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={7} fill="#fff" fontWeight="bold"
                     style={{ pointerEvents: 'none' }}
                   >
                     {hex.isCapital ? '★' : '◆'}
@@ -213,16 +232,12 @@ export default function HexMap({ onHexSelect, selectedHex }) {
                 </>
               )}
 
-              {/* Abbreviation for owned hexes */}
+              {/* Owner abbreviation */}
               {hex.owner !== null && hex.owner !== undefined && (
                 <text
                   x={x} y={y + HEX_SIZE * 0.45}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={6}
-                  fill={ownerColor || '#fff'}
-                  fontWeight="bold"
-                  opacity={0.7}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fontSize={6} fill={ownerColor || '#fff'} fontWeight="bold" opacity={0.8}
                   style={{ pointerEvents: 'none' }}
                 >
                   {players[hex.owner]?.abbreviation}

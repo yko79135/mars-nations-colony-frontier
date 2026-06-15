@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
 import { TECH_TREE } from '@/lib/gameData';
-import { ChevronLeft, FlaskConical, Lock, Check, Beaker } from 'lucide-react';
+import { ChevronLeft, FlaskConical, Lock, Check, Microscope } from 'lucide-react';
 
 const BRANCHES = ['survival', 'energy', 'agriculture', 'industry', 'transportation', 'society', 'planetaryScience'];
 
@@ -93,7 +93,7 @@ export default function TechTree() {
                       {status === 'researched' ? (
                         <Check size={16} className="text-green-400" />
                       ) : status === 'available' ? (
-                        <Beaker size={16} className="text-yellow-400" />
+                        <Microscope size={16} className="text-yellow-400" />
                       ) : (
                         <Lock size={16} className="text-gray-500" />
                       )}

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
-import { Globe, Map, FlaskConical, Handshake, Trophy, BookOpen, Settings, Rocket } from 'lucide-react';
+import { Globe, Map, FlaskConical, Handshake, Trophy, Rocket } from 'lucide-react';
+import { GRADE_MODES } from '@/lib/gameModes';
 
 export default function TopNav() {
   const { lang, setLang, t } = useLang();
@@ -44,6 +45,11 @@ export default function TopNav() {
       )}
       
       <div className="ml-auto flex items-center gap-2">
+        {gameState && (
+          <span className="hidden sm:inline text-xs px-2 py-0.5 rounded bg-gray-700/60 text-gray-400 border border-gray-600">
+            {lang === 'ko' ? GRADE_MODES[gameState.settings?.gradeMode || 'standard']?.labelKo : GRADE_MODES[gameState.settings?.gradeMode || 'standard']?.label}
+          </span>
+        )}
         <button
           onClick={() => setLang(lang === 'en' ? 'ko' : 'en')}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700/50 transition-colors border border-gray-600"

@@ -2,13 +2,9 @@ import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import ModeSelector from './ModeSelector';
+import { GRADE_MODES } from '@/lib/gameModes';
 
-const PRESETS = {
-  short: { mapSize: 'small', gameLength: 10, eventFrequency: 'low', startingResources: 'abundant', actionPointsPerTurn: 4 },
-  standard: { mapSize: 'medium', gameLength: 20, eventFrequency: 'normal', startingResources: 'standard', actionPointsPerTurn: 3 },
-  long: { mapSize: 'large', gameLength: 40, eventFrequency: 'normal', startingResources: 'standard', actionPointsPerTurn: 3 },
-  coop: { mapSize: 'medium', gameLength: 25, eventFrequency: 'high', startingResources: 'scarce', actionPointsPerTurn: 3 },
-};
 
 export default function GameSetup() {
   const { t } = useLang();
@@ -16,19 +12,31 @@ export default function GameSetup() {
   
   const [settings, setSettings] = useState({
     playerCount: 2,
+    gradeMode: 'standard',
     mapSize: 'medium',
     gameLength: 20,
     eventFrequency: 'normal',
     startingResources: 'standard',
-    protectionPeriod: 4,
+    protectionPeriod: 3,
     actionPointsPerTurn: 3,
     educationalMode: true,
     tutorialMode: false,
   });
 
-  const applyPreset = (key) => {
-    const p = PRESETS[key];
-    setSettings(prev => ({ ...prev, ...p }));
+  const applyGradeMode = (modeKey) => {
+    const mode = GRADE_MODES[modeKey];
+    if (mode) {
+      setSettings(s => ({
+        ...s,
+        gradeMode: modeKey,
+        mapSize: mode.mapSize,
+        gameLength: mode.gameLength,
+        eventFrequency: mode.eventFrequency,
+        startingResources: mode.startingResources,
+        protectionPeriod: mode.protectionPeriod,
+        actionPointsPerTurn: mode.actionPointsPerTurn,
+      }));
+    }
   };
 
   const handleNext = () => {
@@ -42,25 +50,10 @@ export default function GameSetup() {
       <div className="max-w-lg w-full bg-gray-900/80 border border-gray-700 rounded-xl p-6">
         <h2 className="text-2xl font-display font-bold text-white mb-6">{t.setup.title}</h2>
         
-        {/* Presets */}
+        {/* Grade Mode */}
         <div className="mb-6">
-          <label className="text-gray-400 text-xs font-heading uppercase tracking-wider mb-2 block">{t.setup.preset}</label>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { key: 'short', label: t.setup.presetShort },
-              { key: 'standard', label: t.setup.presetStandard },
-              { key: 'long', label: t.setup.presetLong },
-              { key: 'coop', label: t.setup.presetCoop },
-            ].map(p => (
-              <button
-                key={p.key}
-                onClick={() => applyPreset(p.key)}
-                className="py-2 px-3 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs rounded border border-gray-700 transition-colors text-left"
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <label className="text-gray-400 text-xs font-heading uppercase tracking-wider mb-2 block">Grade Mode / 학년 모드</label>
+          <ModeSelector value={settings.gradeMode} onChange={applyGradeMode} />
         </div>
 
         <div className="space-y-4">
