@@ -54,7 +54,7 @@ export default function LeftSidebar({ onAction, actionMode }) {
 
       <div className="px-3 py-2 border-b border-gray-700/50">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-gray-400 text-xs">{t.living.score}</span>
+          <span className="text-gray-400 text-xs">{t.scoring.livingConditions}</span>
           <span className={`text-xs font-bold ${(player.scores?.livingConditions || 0) > 60 ? 'text-green-400' : (player.scores?.livingConditions || 0) > 30 ? 'text-yellow-400' : 'text-red-400'}`}>
             {player.scores?.livingConditions || 0}
           </span>
