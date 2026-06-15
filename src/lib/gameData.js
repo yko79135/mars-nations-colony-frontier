@@ -481,6 +481,7 @@ export function createInitialGameState(settings, nations) {
     const hexKey = startPositions[i];
     const hex = map.hexes[hexKey];
     hex.explored = true;
+    hex.exploredBy = { [i]: true };
     hex.owner = i;
     hex.isCapital = true;
     hex.settlement = { name: nation.colonyName, level: 1 };
@@ -491,10 +492,14 @@ export function createInitialGameState(settings, nations) {
       hex.buildings = ['landingHabitat', 'solarFarm', 'waterExtractor', 'greenhouse', 'researchModule'];
     }
 
-    // Explore neighbors
+    // Explore neighboring hexes for this nation's starting vision
     getHexNeighbors(hex.q, hex.r).forEach(n => {
       const nk = `${n.q},${n.r}`;
-      if (map.hexes[nk]) map.hexes[nk].explored = true;
+      if (map.hexes[nk]) {
+        map.hexes[nk].explored = true;
+        if (!map.hexes[nk].exploredBy) map.hexes[nk].exploredBy = {};
+        map.hexes[nk].exploredBy[i] = true;
+      }
     });
 
     const resKey = settings.startingResources || 'standard';

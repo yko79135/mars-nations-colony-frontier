@@ -115,42 +115,55 @@ export function GameProvider({ children }) {
       if (!prev || prev.actionPoints <= 0) return prev;
       const next = JSON.parse(JSON.stringify(prev));
       const hex = next.map.hexes[hexKey];
-      if (!hex || hex.explored) return prev;
+      if (!hex) return prev;
 
-      const player = next.players[next.currentPlayerIndex];
+      const pidx = next.currentPlayerIndex;
+      const player = next.players[pidx];
+
+      // Already explored by this nation?
+      if (hex.exploredBy?.[pidx]) return prev;
+      // Legacy global explored check for starting hexes
+      if (!hex.exploredBy && hex.explored && hex.owner === pidx) return prev;
+
       const hasLongRange = player.technologies.includes('longRangeRovers') || player.technologies.includes('longRangeRover');
-      const range = hasLongRange ? 2 : 1;
 
+      // Helper: is a hex explored by this nation?
+      const exploredByMe = (h) => {
+        if (!h) return false;
+        if (h.exploredBy) return !!h.exploredBy[pidx];
+        return !!h.explored; // legacy starting hex
+      };
+
+      // EXPLORE RULE: target must be adjacent to any hex already explored by this nation.
+      // Ownership is NOT required.
       const neighbors = getHexNeighbors(hex.q, hex.r);
       let isReachable = neighbors.some(n => {
         const nk = `${n.q},${n.r}`;
-        return next.map.hexes[nk] && next.map.hexes[nk].owner === next.currentPlayerIndex;
+        return exploredByMe(next.map.hexes[nk]);
       });
 
-      if (!isReachable && range >= 2) {
-        // Check if any owned hex is within 2 steps
+      // Long-range rover: within distance 2 of any explored-by-me hex
+      if (!isReachable && hasLongRange) {
         isReachable = Object.values(next.map.hexes).some(h => {
-          if (h.owner !== next.currentPlayerIndex) return false;
-          const dist = Math.max(Math.abs(h.q - hex.q), Math.abs(h.r - hex.r), Math.abs((-h.q - h.r) - (-hex.q - hex.r)));
-          return dist <= range;
-        });
-      }
-
-      if (!isReachable) {
-        isReachable = neighbors.some(n => {
-          const nk = `${n.q},${n.r}`;
-          return next.map.hexes[nk] && next.map.hexes[nk].explored;
+          if (!exploredByMe(h)) return false;
+          const dist = Math.max(
+            Math.abs(h.q - hex.q),
+            Math.abs(h.r - hex.r),
+            Math.abs((-h.q - h.r) - (-hex.q - hex.r))
+          );
+          return dist <= 2;
         });
       }
 
       if (!isReachable) return prev;
 
+      // Mark this hex as explored by this nation (per-nation tracking)
+      if (!hex.exploredBy) hex.exploredBy = {};
+      hex.exploredBy[pidx] = true;
+      // Keep legacy field in sync for HexInfoPanel / other legacy reads
       hex.explored = true;
+
       next.actionPoints -= 1;
-      neighbors.forEach(n => {
-        const nk = `${n.q},${n.r}`;
-        if (next.map.hexes[nk]) next.map.hexes[nk].explored = true;
-      });
       return next;
     });
   }, []);
@@ -159,14 +172,17 @@ export function GameProvider({ children }) {
     setGameState(prev => {
       if (!prev || prev.actionPoints <= 0) return prev;
       const next = JSON.parse(JSON.stringify(prev));
-      const player = next.players[next.currentPlayerIndex];
+      const pidx = next.currentPlayerIndex;
+      const player = next.players[pidx];
       const hex = next.map.hexes[hexKey];
-      if (!hex || !hex.explored || hex.owner !== null) return prev;
+      // Must be explored by this nation and unclaimed
+      const exploredByMe = hex?.exploredBy ? !!hex.exploredBy[pidx] : !!hex?.explored;
+      if (!hex || !exploredByMe || hex.owner !== null) return prev;
 
       const neighbors = getHexNeighbors(hex.q, hex.r);
       const hasAdj = neighbors.some(n => {
         const nk = `${n.q},${n.r}`;
-        return next.map.hexes[nk] && next.map.hexes[nk].owner === next.currentPlayerIndex;
+        return next.map.hexes[nk] && next.map.hexes[nk].owner === pidx;
       });
       if (!hasAdj) return prev;
 
@@ -178,7 +194,7 @@ export function GameProvider({ children }) {
         player.resources[res] -= amt;
       }
 
-      hex.owner = next.currentPlayerIndex;
+      hex.owner = pidx;
       next.actionPoints -= 1;
       return next;
     });

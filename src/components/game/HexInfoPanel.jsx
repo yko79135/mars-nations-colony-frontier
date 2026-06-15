@@ -26,10 +26,13 @@ export default function HexInfoPanel({ hexKey, onClose, actionMode }) {
   const hex = gameState.map.hexes[hexKey];
   if (!hex) return null;
 
-  const player = gameState.players[gameState.currentPlayerIndex];
+  const pidx = gameState.currentPlayerIndex;
+  const player = gameState.players[pidx];
   const ownerPlayer = hex.owner !== null && hex.owner !== undefined ? gameState.players[hex.owner] : null;
   const terrainData = TERRAIN_TYPES[hex.terrain];
-  const isOwned = hex.owner === gameState.currentPlayerIndex;
+  const isOwned = hex.owner === pidx;
+  // Per-nation explored check
+  const exploredByMe = hex.exploredBy ? !!hex.exploredBy[pidx] : !!hex.explored;
 
   const buildableBuildings = isOwned && actionMode === 'build'
     ? Object.entries(BUILDINGS).filter(([id, b]) => {
@@ -57,7 +60,7 @@ export default function HexInfoPanel({ hexKey, onClose, actionMode }) {
         <button onClick={onClose} className="text-gray-600 hover:text-white transition-colors"><X size={15} /></button>
       </div>
 
-      {hex.explored ? (
+      {exploredByMe ? (
         <div className="flex-1 p-4 space-y-4">
           {/* Terrain */}
           <div className="rounded-xl px-3 py-3 flex items-center gap-3"

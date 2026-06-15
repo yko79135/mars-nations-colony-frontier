@@ -221,12 +221,15 @@ export function HexTooltip({ hexKey, gameState, onClose }) {
   };
   const tip = terrainBuildingTips[hex.terrain];
 
+  const pidx = gameState.currentPlayerIndex;
+  const exploredByMe = hex.exploredBy ? !!hex.exploredBy[pidx] : !!hex.explored;
+
   // Hex state
   let stateLabel = lang === 'ko' ? '미탐사' : 'Unexplored';
   let stateColor = 'text-gray-400';
-  if (hex.explored && owner === null) { stateLabel = lang === 'ko' ? '탐사됨 — 점령 가능' : 'Explored — can be claimed'; stateColor = 'text-green-300'; }
-  if (hex.explored && owner !== null && owner.index !== currentPlayer.index) { stateLabel = lang === 'ko' ? `${owner.countryName}의 영토` : `${owner.countryName}'s territory`; stateColor = 'text-orange-300'; }
-  if (hex.explored && owner !== null && owner.index === currentPlayer.index) { stateLabel = lang === 'ko' ? '내 영토' : 'Your territory'; stateColor = 'text-blue-300'; }
+  if (exploredByMe && owner === null) { stateLabel = lang === 'ko' ? '탐사됨 — 점령 가능' : 'Explored — can be claimed'; stateColor = 'text-green-300'; }
+  if (exploredByMe && owner !== null && owner.index !== currentPlayer.index) { stateLabel = lang === 'ko' ? `${owner.countryName}의 영토` : `${owner.countryName}'s territory`; stateColor = 'text-orange-300'; }
+  if (exploredByMe && owner !== null && owner.index === currentPlayer.index) { stateLabel = lang === 'ko' ? '내 영토' : 'Your territory'; stateColor = 'text-blue-300'; }
 
   return (
     <div className="absolute bottom-14 left-2 z-20 w-56 bg-gray-900/98 border border-gray-600 rounded-xl shadow-2xl p-3">
@@ -234,11 +237,11 @@ export function HexTooltip({ hexKey, gameState, onClose }) {
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded flex items-center justify-center text-xl shrink-0 border border-gray-600"
             style={{ backgroundColor: terrain?.color || '#333' }}>
-            {hex.explored ? (terrain?.icon || '?') : '❓'}
+            {exploredByMe ? (terrain?.icon || '?') : '❓'}
           </div>
           <div>
             <p className="text-white font-heading font-semibold text-xs leading-tight">
-              {hex.explored ? (lang === 'ko' ? getTerrainNameKo(hex.terrain) : getTerrainNameEn(hex.terrain)) : (lang === 'ko' ? '미탐사 타일' : 'Unexplored Tile')}
+              {exploredByMe ? (lang === 'ko' ? getTerrainNameKo(hex.terrain) : getTerrainNameEn(hex.terrain)) : (lang === 'ko' ? '미탐사 타일' : 'Unexplored Tile')}
             </p>
             <p className={`text-[10px] ${stateColor}`}>{stateLabel}</p>
           </div>
@@ -246,7 +249,7 @@ export function HexTooltip({ hexKey, gameState, onClose }) {
         <button onClick={onClose} className="text-gray-500 hover:text-white shrink-0"><X size={12} /></button>
       </div>
 
-      {hex.explored && (
+      {exploredByMe && (
         <>
           {tip && (
             <p className="text-amber-300 text-[10px] bg-amber-900/20 border border-amber-700/30 rounded px-2 py-1 mb-2">
@@ -278,7 +281,7 @@ export function HexTooltip({ hexKey, gameState, onClose }) {
         </>
       )}
 
-      {!hex.explored && (
+      {!exploredByMe && (
         <p className="text-gray-400 text-[10px]">
           {lang === 'ko' ? '탐사 행동을 선택하면 이 타일을 조사할 수 있어요.' : 'Choose Explore action to investigate this tile.'}
         </p>

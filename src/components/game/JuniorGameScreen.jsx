@@ -11,27 +11,42 @@ import BuildingGuideModal, { BuildSelectionCards, HexTooltip, JUNIOR_BUILDING_GU
 import { getHexNeighbors } from '@/lib/gameData';
 import { Save, Search, MapPin, Hammer, FlaskConical, Heart, SkipForward, X, HelpCircle, BookOpen } from 'lucide-react';
 
+// Helper: is a hex explored by a given nation index?
+function exploredByNation(hex, nationIndex) {
+  if (!hex) return false;
+  if (hex.exploredBy) return !!hex.exploredBy[nationIndex];
+  return !!hex.explored; // legacy
+}
+
 function checkValidTargets(actionMode, gameState) {
   if (!gameState || !actionMode) return { hasTargets: false, reason: '' };
   const { map, players, currentPlayerIndex } = gameState;
   const player = players[currentPlayerIndex];
-  const hasLongRange = player.technologies.includes('longRangeRover');
-  const range = hasLongRange ? 2 : 1;
+  const hasLongRange = player.technologies.includes('longRangeRover') || player.technologies.includes('longRangeRovers');
+  const pidx = currentPlayerIndex;
 
   if (actionMode === 'explore') {
     const hasTargets = Object.values(map.hexes).some(hex => {
-      if (hex.explored) return false;
-      if (range >= 2) {
-        return Object.values(map.hexes).some(h => h.owner === currentPlayerIndex && Math.max(Math.abs(h.q - hex.q), Math.abs(h.r - hex.r), Math.abs((-h.q - h.r) - (-hex.q - hex.r))) <= range);
+      if (exploredByNation(hex, pidx)) return false;
+      const adjExplored = getHexNeighbors(hex.q, hex.r).some(n => {
+        const nk = `${n.q},${n.r}`;
+        return exploredByNation(map.hexes[nk], pidx);
+      });
+      if (adjExplored) return true;
+      if (hasLongRange) {
+        return Object.values(map.hexes).some(h => {
+          if (!exploredByNation(h, pidx)) return false;
+          return Math.max(Math.abs(h.q - hex.q), Math.abs(h.r - hex.r), Math.abs((-h.q - h.r) - (-hex.q - hex.r))) <= 2;
+        });
       }
-      return getHexNeighbors(hex.q, hex.r).some(n => { const nk = `${n.q},${n.r}`; return map.hexes[nk]?.owner === currentPlayerIndex; });
+      return false;
     });
     return { hasTargets, reason: 'noValidExplore' };
   }
   if (actionMode === 'claim') {
     const hasTargets = Object.values(map.hexes).some(hex => {
-      if (!hex.explored || hex.owner !== null) return false;
-      return getHexNeighbors(hex.q, hex.r).some(n => { const nk = `${n.q},${n.r}`; return map.hexes[nk]?.owner === currentPlayerIndex; });
+      if (!exploredByNation(hex, pidx) || hex.owner !== null) return false;
+      return getHexNeighbors(hex.q, hex.r).some(n => { const nk = `${n.q},${n.r}`; return map.hexes[nk]?.owner === pidx; });
     });
     return { hasTargets, reason: 'noValidClaim' };
   }
