@@ -1,8 +1,11 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel } from './gameData';
 import { JUNIOR_TECHS } from './gameModes';
 
 const GameContext = createContext();
+
+// Stable default viewBox for a fresh camera
+const DEFAULT_VIEWBOX = { x: 0, y: 0, w: 800, h: 600 };
 
 // Apply the effect of a researched technology immediately to the player object
 function applyTechEffect(player, techId, techData) {
@@ -47,8 +50,52 @@ export function GameProvider({ children }) {
   const [gameState, setGameState] = useState(null);
   const [screen, setScreen] = useState('menu');
 
+  // Camera state — completely separate from gameState, never reset by game actions.
+  // Keyed by mapId (radius-hexCount) so Junior and Senior each preserve their own view.
+  // Only reset explicitly: new game, load game, or player calls resetView/fitToScreen.
+  const [cameraViews, setCameraViews] = useState({});
+  const fittedMapsRef = useRef(new Set());
+
+  const getMapId = (gs) => {
+    if (!gs?.map) return null;
+    return `${gs.map.radius}-${Object.keys(gs.map.hexes).length}`;
+  };
+
+  const getViewBox = useCallback((gs) => {
+    const id = getMapId(gs);
+    if (!id) return DEFAULT_VIEWBOX;
+    return cameraViews[id] || DEFAULT_VIEWBOX;
+  }, [cameraViews]);
+
+  const setViewBox = useCallback((gs, updater) => {
+    const id = getMapId(gs);
+    if (!id) return;
+    setCameraViews(prev => {
+      const current = prev[id] || DEFAULT_VIEWBOX;
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      return { ...prev, [id]: next };
+    });
+  }, []);
+
+  // Called by HexMap on first render of a new map — only runs once per mapId
+  const fitMapToScreen = useCallback((gs, computedViewBox) => {
+    const id = getMapId(gs);
+    if (!id || fittedMapsRef.current.has(id)) return;
+    fittedMapsRef.current.add(id);
+    setCameraViews(prev => ({ ...prev, [id]: computedViewBox }));
+  }, []);
+
+  const resetMapView = useCallback((gs) => {
+    const id = getMapId(gs);
+    if (!id) return;
+    setCameraViews(prev => ({ ...prev, [id]: DEFAULT_VIEWBOX }));
+  }, []);
+
   const startGame = useCallback((settings, nations) => {
     const state = createInitialGameState(settings, nations);
+    // Clear all camera views for new game so fresh fit-to-screen runs
+    fittedMapsRef.current = new Set();
+    setCameraViews({});
     setGameState(state);
     setScreen('playing');
   }, []);
@@ -317,13 +364,27 @@ export function GameProvider({ children }) {
   const saveGame = useCallback((name) => {
     if (!gameState) return;
     const saves = JSON.parse(localStorage.getItem('marsNationsSaves') || '{}');
-    saves[name] = { ...gameState, savedAt: new Date().toISOString() };
+    // Persist camera views alongside game state
+    saves[name] = { ...gameState, _cameraViews: cameraViews, savedAt: new Date().toISOString() };
     localStorage.setItem('marsNationsSaves', JSON.stringify(saves));
-  }, [gameState]);
+  }, [gameState, cameraViews]);
 
   const loadGame = useCallback((name) => {
     const saves = JSON.parse(localStorage.getItem('marsNationsSaves') || '{}');
-    if (saves[name]) { setGameState(saves[name]); setScreen('playing'); }
+    if (saves[name]) {
+      const saved = saves[name];
+      // Restore saved camera views; if none saved, clear so fit-to-screen runs once
+      fittedMapsRef.current = new Set();
+      if (saved._cameraViews) {
+        // Mark all saved maps as already fitted so we restore rather than re-fit
+        Object.keys(saved._cameraViews).forEach(id => fittedMapsRef.current.add(id));
+        setCameraViews(saved._cameraViews);
+      } else {
+        setCameraViews({});
+      }
+      setGameState(saved);
+      setScreen('playing');
+    }
   }, []);
 
   const getSavedGames = useCallback(() => JSON.parse(localStorage.getItem('marsNationsSaves') || '{}'), []);
@@ -340,6 +401,8 @@ export function GameProvider({ children }) {
       exploreHex, claimHex, buildOnHex, researchTech, giveResource,
       endTurn, dismissEvent,
       saveGame, loadGame, getSavedGames, deleteSave,
+      // Camera API — stable, never touched by game actions
+      getViewBox, setViewBox, fitMapToScreen, resetMapView,
     }}>
       {children}
     </GameContext.Provider>

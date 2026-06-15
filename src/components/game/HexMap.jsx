@@ -1,7 +1,7 @@
-import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { useGame } from '@/lib/gameContext';
 import { TERRAIN_TYPES, hexToPixel, getHexCorners, getHexNeighbors } from '@/lib/gameData';
-import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react';
 
 const HEX_SIZE = 30;
 
@@ -10,22 +10,103 @@ function getTerrainFill(terrain, explored) {
   return TERRAIN_TYPES[terrain]?.color || '#444';
 }
 
+// Compute the fit-to-screen viewBox from hex positions — pure function, no hooks
+function computeFitViewBox(hexes) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  Object.values(hexes).forEach(hex => {
+    const { x, y } = hexToPixel(hex.q, hex.r, HEX_SIZE);
+    minX = Math.min(minX, x - HEX_SIZE); minY = Math.min(minY, y - HEX_SIZE);
+    maxX = Math.max(maxX, x + HEX_SIZE); maxY = Math.max(maxY, y + HEX_SIZE);
+  });
+  const padding = HEX_SIZE * 2;
+  return { x: minX - padding, y: minY - padding, w: (maxX - minX) + padding * 2, h: (maxY - minY) + padding * 2 };
+}
+
 export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
-  const { gameState } = useGame();
-  const svgRef = useRef(null);
+  const { gameState, getViewBox, setViewBox, fitMapToScreen, resetMapView } = useGame();
   const containerRef = useRef(null);
-
-  // Camera state lives here — stable, never reset by game-state changes.
-  // Only resetView() and fitToScreen() (called from the button) change it.
-  const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 800, h: 600 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-
-  // Track which map we have already fitted — fit only once per new map generation.
-  const fittedMapRef = useRef(null);
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
 
   const map = gameState?.map;
   const players = gameState?.players || [];
+
+  // Camera viewBox lives in GameContext — survives remounts and game-state updates
+  const viewBox = getViewBox(gameState);
+
+  // Auto-fit to screen once per new map — uses fitMapToScreen which is guarded by fittedMapsRef
+  useEffect(() => {
+    if (!map) return;
+    const fitted = computeFitViewBox(map.hexes);
+    fitMapToScreen(gameState, fitted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map?.radius, map ? Object.keys(map.hexes).length : 0]); // only fires when map identity changes
+
+  const handleFitToScreen = useCallback(() => {
+    if (!map) return;
+    setViewBox(gameState, computeFitViewBox(map.hexes));
+  }, [map, gameState, setViewBox]);
+
+  const handleResetView = useCallback(() => {
+    resetMapView(gameState);
+  }, [gameState, resetMapView]);
+
+  const handleZoom = useCallback((dir) => {
+    setViewBox(gameState, prev => {
+      const factor = dir > 0 ? 0.8 : 1.25;
+      const newW = prev.w * factor, newH = prev.h * factor;
+      const cx = prev.x + prev.w / 2, cy = prev.y + prev.h / 2;
+      return { x: cx - newW / 2, y: cy - newH / 2, w: newW, h: newH };
+    });
+  }, [gameState, setViewBox]);
+
+  // Pan handlers — use refs to avoid stale closures and prevent re-registering on every render
+  const handleMouseDown = useCallback((e) => {
+    if (e.button === 0 || e.button === 1) {
+      isPanningRef.current = true;
+      panStartRef.current = { x: e.clientX, y: e.clientY };
+    }
+  }, []);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isPanningRef.current || !containerRef.current) return;
+    setViewBox(gameState, prev => {
+      const dx = (e.clientX - panStartRef.current.x) * (prev.w / containerRef.current.clientWidth);
+      const dy = (e.clientY - panStartRef.current.y) * (prev.h / containerRef.current.clientHeight);
+      panStartRef.current = { x: e.clientX, y: e.clientY };
+      return { ...prev, x: prev.x - dx, y: prev.y - dy };
+    });
+  }, [gameState, setViewBox]);
+
+  const handleMouseUp = useCallback(() => { isPanningRef.current = false; }, []);
+
+  const handleTouchStart = useCallback((e) => {
+    if (e.touches.length === 1) {
+      isPanningRef.current = true;
+      panStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!isPanningRef.current || e.touches.length !== 1 || !containerRef.current) return;
+    setViewBox(gameState, prev => {
+      const dx = (e.touches[0].clientX - panStartRef.current.x) * (prev.w / containerRef.current.clientWidth);
+      const dy = (e.touches[0].clientY - panStartRef.current.y) * (prev.h / containerRef.current.clientHeight);
+      panStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      return { ...prev, x: prev.x - dx, y: prev.y - dy };
+    });
+  }, [gameState, setViewBox]);
+
+  const handleTouchEnd = useCallback(() => { isPanningRef.current = false; }, []);
+
+  // Wheel zoom — registered once, cleaned up on unmount only
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e) => { e.preventDefault(); handleZoom(e.deltaY < 0 ? 1 : -1); };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [handleZoom]);
 
   const validTiles = useMemo(() => {
     if (!map || !gameState || !actionMode) return new Set();
@@ -45,90 +126,20 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
       if (actionMode === 'build' && hex.owner === pidx) valid.add(key);
     });
     return valid;
-  }, [map, gameState, actionMode]);
-
-  // Calculate the fit-to-screen viewBox from the current map extents
-  const computeFitViewBox = useCallback(() => {
-    if (!map) return null;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    Object.values(map.hexes).forEach(hex => {
-      const { x, y } = hexToPixel(hex.q, hex.r, HEX_SIZE);
-      minX = Math.min(minX, x - HEX_SIZE); minY = Math.min(minY, y - HEX_SIZE);
-      maxX = Math.max(maxX, x + HEX_SIZE); maxY = Math.max(maxY, y + HEX_SIZE);
-    });
-    const padding = HEX_SIZE * 2;
-    return { x: minX - padding, y: minY - padding, w: (maxX - minX) + padding * 2, h: (maxY - minY) + padding * 2 };
-  }, [map]);
-
-  const fitToScreen = useCallback(() => {
-    const vb = computeFitViewBox();
-    if (vb) setViewBox(vb);
-  }, [computeFitViewBox]);
-
-  const resetView = useCallback(() => {
-    setViewBox({ x: 0, y: 0, w: 800, h: 600 });
-  }, []);
-
-  // Fit to screen ONLY when a brand-new map first appears — never again until a new game starts.
-  // We identify the map by the number of hexes + radius, which is stable within a game session.
-  useEffect(() => {
-    if (!map) return;
-    const mapId = `${map.radius}-${Object.keys(map.hexes).length}`;
-    if (fittedMapRef.current === mapId) return; // already fitted this map
-    fittedMapRef.current = mapId;
-    const vb = computeFitViewBox();
-    if (vb) setViewBox(vb);
-  }, [map, computeFitViewBox]); // computeFitViewBox is stable as long as map reference identity doesn't change
-
-  // Wheel zoom — passive: false so we can preventDefault
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onWheel = (e) => { e.preventDefault(); handleZoom(e.deltaY < 0 ? 1 : -1); };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  });
-
-  const handleZoom = (dir) => {
-    setViewBox(prev => {
-      const factor = dir > 0 ? 0.8 : 1.25;
-      const newW = prev.w * factor, newH = prev.h * factor;
-      const cx = prev.x + prev.w / 2, cy = prev.y + prev.h / 2;
-      return { x: cx - newW / 2, y: cy - newH / 2, w: newW, h: newH };
-    });
-  };
-
-  const handleMouseDown = (e) => { if (e.button === 0 || e.button === 1) { setIsPanning(true); setPanStart({ x: e.clientX, y: e.clientY }); } };
-  const handleMouseMove = (e) => {
-    if (!isPanning || !containerRef.current) return;
-    const dx = (e.clientX - panStart.x) * (viewBox.w / containerRef.current.clientWidth);
-    const dy = (e.clientY - panStart.y) * (viewBox.h / containerRef.current.clientHeight);
-    setViewBox(prev => ({ ...prev, x: prev.x - dx, y: prev.y - dy }));
-    setPanStart({ x: e.clientX, y: e.clientY });
-  };
-  const handleMouseUp = () => setIsPanning(false);
-
-  const handleTouchStart = (e) => { if (e.touches.length === 1) { setIsPanning(true); setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY }); } };
-  const handleTouchMove = (e) => {
-    if (!isPanning || e.touches.length !== 1 || !containerRef.current) return;
-    const dx = (e.touches[0].clientX - panStart.x) * (viewBox.w / containerRef.current.clientWidth);
-    const dy = (e.touches[0].clientY - panStart.y) * (viewBox.h / containerRef.current.clientHeight);
-    setViewBox(prev => ({ ...prev, x: prev.x - dx, y: prev.y - dy }));
-    setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-  };
-  const handleTouchEnd = () => setIsPanning(false);
+  }, [map, gameState?.currentPlayerIndex, actionMode]); // only depends on specific fields, not full gameState
 
   if (!map) return null;
 
   return (
     <div className="relative w-full h-full" ref={containerRef}>
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
-        <button onClick={() => handleZoom(1)} className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><ZoomIn size={16} /></button>
-        <button onClick={() => handleZoom(-1)} className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><ZoomOut size={16} /></button>
-        <button onClick={fitToScreen} title="Fit to screen" className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><Maximize size={16} /></button>
+        <button onClick={() => handleZoom(1)} title="Zoom in" className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><ZoomIn size={16} /></button>
+        <button onClick={() => handleZoom(-1)} title="Zoom out" className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><ZoomOut size={16} /></button>
+        <button onClick={handleFitToScreen} title="Fit to screen" className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><Maximize size={16} /></button>
+        <button onClick={handleResetView} title="Reset view" className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><RotateCcw size={14} /></button>
       </div>
 
-      <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing select-none"
+      <svg className="w-full h-full cursor-grab active:cursor-grabbing select-none"
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
         onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
         onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
