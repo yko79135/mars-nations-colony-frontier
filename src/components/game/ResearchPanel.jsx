@@ -5,7 +5,7 @@ import { JUNIOR_TECHS } from '@/lib/gameModes';
 import { TECH_TREE, getPlayerLabLevel } from '@/lib/gameData';
 import { X, FlaskConical, Check, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 
-// ---- Junior Research Panel ----
+// ---- Junior ----
 function JuniorResearchPanel({ onClose }) {
   const { t, lang } = useLang();
   const { gameState, researchTech } = useGame();
@@ -20,8 +20,7 @@ function JuniorResearchPanel({ onClose }) {
     setErrorMsg('');
     if (player.technologies.includes(techId)) { setErrorMsg(t.research.alreadyResearched); return; }
     if (ap <= 0) { setErrorMsg(t.research.notEnoughAP); return; }
-    const cost = techData.cost.science || 0;
-    if ((player.resources.science || 0) < cost) { setErrorMsg(t.research.notEnoughScience); return; }
+    if ((player.resources.science || 0) < (techData.cost.science || 0)) { setErrorMsg(t.research.notEnoughScience); return; }
     for (const prereq of techData.prerequisites) {
       if (!player.technologies.includes(prereq)) { setErrorMsg(t.research.prerequisitesMissing); return; }
     }
@@ -30,67 +29,84 @@ function JuniorResearchPanel({ onClose }) {
     setTimeout(() => setJustResearched(null), 2000);
   };
 
-  const techList = Object.entries(JUNIOR_TECHS);
-
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="max-w-md w-full bg-gray-900 border border-purple-700/50 rounded-xl p-5" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <FlaskConical size={18} className="text-purple-400" />
-            <h3 className="text-white font-heading font-bold text-lg">{t.research.juniorTitle}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}>
+      <div className="max-w-md w-full rounded-2xl overflow-hidden shadow-2xl"
+        style={{ background: 'rgba(8,12,25,0.99)', border: '1px solid rgba(167,139,250,0.3)', boxShadow: '0 0 40px rgba(167,139,250,0.12)' }}
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)' }}>
+              <FlaskConical size={15} className="text-purple-400" />
+            </div>
+            <h3 className="text-white font-heading font-bold text-base">{t.research.juniorTitle}</h3>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={18} /></button>
+          <button onClick={onClose} className="text-gray-600 hover:text-white transition-colors"><X size={17} /></button>
         </div>
 
-        <div className="flex items-center gap-3 mb-4 p-2 bg-gray-800/60 rounded-lg text-xs">
-          <span className="text-gray-400">🔬 {t.resources.science}: <span className="text-purple-400 font-bold">{player.resources.science || 0}</span></span>
-          <span className="text-gray-400">{t.actions.actionPoints}: <span className="text-orange-400 font-bold">{ap}</span></span>
+        <div className="flex items-center gap-4 px-5 py-2.5"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+          <span className="text-gray-500 text-xs">🔬 <span className="text-purple-400 font-bold font-mono">{player.resources.science || 0}</span></span>
+          <span className="text-gray-500 text-xs">AP: <span className="text-orange-400 font-bold font-mono">{ap}</span></span>
         </div>
 
         {errorMsg && (
-          <div className="mb-3 px-3 py-2 bg-red-900/30 border border-red-700/50 rounded text-red-300 text-xs">{errorMsg}</div>
+          <div className="mx-4 mt-3 px-3 py-2 rounded-lg text-xs text-red-300"
+            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>{errorMsg}</div>
         )}
         {justResearched && (
-          <div className="mb-3 px-3 py-2 bg-green-900/30 border border-green-700/50 rounded text-green-300 text-xs">
-            ✓ {lang === 'ko' ? t.research.confirmedKo : t.research.confirmed}
+          <div className="mx-4 mt-3 px-3 py-2 rounded-lg text-xs text-green-300 flex items-center gap-2"
+            style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)' }}>
+            <Check size={12} /> {lang === 'ko' ? t.research.confirmedKo : t.research.confirmed}
           </div>
         )}
 
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {techList.map(([techId, techData]) => {
+        <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+          {Object.entries(JUNIOR_TECHS).map(([techId, techData]) => {
             const isResearched = player.technologies.includes(techId);
             const canAfford = (player.resources.science || 0) >= techData.cost.science;
             const prereqsMet = techData.prerequisites.every(p => player.technologies.includes(p));
             const canResearch = !isResearched && canAfford && prereqsMet && ap > 0;
-
             return (
-              <div key={techId} className={`p-3 rounded-lg border transition-all ${isResearched ? 'border-green-700/40 bg-green-900/10 opacity-70' : canResearch ? 'border-purple-600/40 bg-purple-900/10' : 'border-gray-700/50 bg-gray-800/30'}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {isResearched ? <Check size={14} className="text-green-400 shrink-0" /> : prereqsMet ? <FlaskConical size={14} className="text-purple-400 shrink-0" /> : <Lock size={14} className="text-gray-500 shrink-0" />}
-                    <div>
-                      <p className="text-white font-medium text-sm">{lang === 'ko' ? (techData.nameKo || t.tech[techId] || techId) : (techData.nameEn || t.tech[techId] || techId)}</p>
-                      <p className="text-gray-400 text-xs mt-0.5">{lang === 'ko' ? techData.effectDescKo : techData.effectDesc}</p>
+              <div key={techId} className="rounded-xl px-3 py-3 transition-all"
+                style={{
+                  background: isResearched ? 'rgba(74,222,128,0.06)' : canResearch ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${isResearched ? 'rgba(74,222,128,0.25)' : canResearch ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.07)'}`,
+                  opacity: isResearched ? 0.7 : 1,
+                }}>
+                <div className="flex items-start gap-2.5 justify-between">
+                  <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <span className="mt-0.5 shrink-0">
+                      {isResearched ? <Check size={13} className="text-green-400" /> : prereqsMet ? <FlaskConical size={13} className="text-purple-400" /> : <Lock size={13} className="text-gray-600" />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-white font-medium text-sm leading-tight">
+                        {lang === 'ko' ? (techData.nameKo || t.tech[techId] || techId) : (techData.nameEn || t.tech[techId] || techId)}
+                      </p>
+                      <p className="text-gray-500 text-[11px] mt-0.5">{lang === 'ko' ? techData.effectDescKo : techData.effectDesc}</p>
                     </div>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-xs text-purple-300 font-mono">🔬 {techData.cost.science}</div>
-                  </div>
+                  <span className="text-purple-300 font-mono text-xs shrink-0">🔬 {techData.cost.science}</span>
                 </div>
                 {isResearched ? (
-                  <div className="mt-1 text-[11px] text-green-400">{t.research.researched}</div>
+                  <p className="mt-1.5 text-[11px] text-green-400">{t.research.researched}</p>
                 ) : canResearch ? (
                   <button onClick={() => handleResearch(techId, techData)}
-                    className="mt-2 w-full py-1.5 bg-purple-600/40 hover:bg-purple-600/60 text-purple-200 rounded text-xs font-medium transition-colors">
+                    className="mt-2 w-full py-1.5 rounded-lg text-xs font-heading font-bold transition-all"
+                    style={{ background: 'rgba(167,139,250,0.2)', border: '1px solid rgba(167,139,250,0.4)', color: '#c4b5fd' }}>
                     {t.research.researchBtn} (🔬 {techData.cost.science})
                   </button>
                 ) : !prereqsMet ? (
-                  <div className="mt-1 text-[11px] text-gray-500">{t.research.prerequisitesMissing}</div>
+                  <p className="mt-1.5 text-[11px] text-gray-600">{t.research.prerequisitesMissing}</p>
                 ) : !canAfford ? (
-                  <div className="mt-1 text-[11px] text-red-400">{t.research.notEnoughScience}</div>
+                  <p className="mt-1.5 text-[11px] text-red-400">{t.research.notEnoughScience}</p>
                 ) : (
-                  <div className="mt-1 text-[11px] text-gray-500">{t.research.notEnoughAP}</div>
+                  <p className="mt-1.5 text-[11px] text-gray-600">{t.research.notEnoughAP}</p>
                 )}
               </div>
             );
@@ -101,9 +117,17 @@ function JuniorResearchPanel({ onClose }) {
   );
 }
 
-// ---- Senior Research Panel (full branching tree) ----
+// ---- Senior ----
 const BRANCHES = ['survival', 'energy', 'agriculture', 'industry', 'transportation', 'society', 'planetaryScience'];
-const BRANCH_ICONS = { survival: '❤️', energy: '⚡', agriculture: '🌱', industry: '⚙️', transportation: '🚀', society: '🏛️', planetaryScience: '🔭' };
+const BRANCH_META = {
+  survival:         { icon: '❤️', color: '#f87171' },
+  energy:           { icon: '⚡', color: '#eab308' },
+  agriculture:      { icon: '🌱', color: '#4ade80' },
+  industry:         { icon: '⚙️', color: '#94a3b8' },
+  transportation:   { icon: '🚀', color: '#60a5fa' },
+  society:          { icon: '🏛️', color: '#fb923c' },
+  planetaryScience: { icon: '🔭', color: '#a78bfa' },
+};
 const LAB_LABELS = { null: 'noLab', 1: 'researchLab', 2: 'advancedLab' };
 
 function SeniorResearchPanel({ onClose }) {
@@ -134,15 +158,13 @@ function SeniorResearchPanel({ onClose }) {
   const handleResearch = (techId) => {
     setErrorMsg('');
     const techData = TECH_TREE[techId];
-    if (!techData) return;
-    if (player.technologies.includes(techId)) { setErrorMsg(t.research.alreadyResearched); return; }
+    if (!techData || player.technologies.includes(techId)) { setErrorMsg(t.research.alreadyResearched); return; }
     if (ap <= 0) { setErrorMsg(t.research.notEnoughAP); return; }
     for (const prereq of techData.prerequisites) {
       if (!player.technologies.includes(prereq)) { setErrorMsg(t.research.prerequisitesMissing); return; }
     }
     if (techData.labRequired && labLevel < techData.labRequired) {
-      setErrorMsg(techData.labRequired === 2 ? t.research.advancedLabMissing : t.research.labMissing);
-      return;
+      setErrorMsg(techData.labRequired === 2 ? t.research.advancedLabMissing : t.research.labMissing); return;
     }
     for (const [res, amt] of Object.entries(techData.cost)) {
       if ((player.resources[res] || 0) < amt) { setErrorMsg(t.research.notEnoughScience); return; }
@@ -153,72 +175,110 @@ function SeniorResearchPanel({ onClose }) {
   };
 
   const branchTechs = Object.entries(TECH_TREE).filter(([, d]) => d.branch === selectedBranch);
+  const activeMeta = BRANCH_META[selectedBranch] || { icon: '🔬', color: '#a78bfa' };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="max-w-2xl w-full bg-gray-900 border border-purple-700/50 rounded-xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b border-gray-800">
-          <div className="flex items-center gap-2">
-            <FlaskConical size={18} className="text-purple-400" />
-            <h3 className="text-white font-heading font-bold text-lg">{t.research.title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}>
+      <div className="max-w-2xl w-full rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+        style={{ background: 'rgba(6,9,22,0.99)', border: '1px solid rgba(167,139,250,0.25)', boxShadow: '0 0 50px rgba(167,139,250,0.1)' }}
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)' }}>
+              <FlaskConical size={15} className="text-purple-400" />
+            </div>
+            <h3 className="text-white font-heading font-bold text-base">{t.research.title}</h3>
           </div>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-gray-400">🔬 <span className="text-purple-400 font-bold">{player.resources.science || 0}</span></span>
-            <span className="text-gray-400">AP: <span className="text-orange-400 font-bold">{ap}</span></span>
-            <span className="text-xs px-2 py-0.5 bg-gray-800 rounded border border-gray-700 text-gray-400">
-              Lab: {labLevel === 2 ? '🏆' : labLevel === 1 ? '🔬' : '📡'} L{labLevel}
+          <div className="flex items-center gap-3">
+            <span className="text-gray-500 text-xs">🔬 <span className="text-purple-400 font-bold">{player.resources.science || 0}</span></span>
+            <span className="text-gray-500 text-xs">AP <span className="text-orange-400 font-bold">{ap}</span></span>
+            <span className="text-[10px] px-2.5 py-1 rounded-full"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
+              Lab L{labLevel}
             </span>
-            <button onClick={onClose} className="text-gray-500 hover:text-white ml-2"><X size={18} /></button>
+            <button onClick={onClose} className="text-gray-600 hover:text-white transition-colors ml-1"><X size={16} /></button>
           </div>
         </div>
 
         {(errorMsg || justResearched) && (
-          <div className={`mx-4 mt-3 px-3 py-2 rounded text-xs ${justResearched ? 'bg-green-900/30 border border-green-700/50 text-green-300' : 'bg-red-900/30 border border-red-700/50 text-red-300'}`}>
-            {justResearched ? `✓ ${t.research.confirmed}` : errorMsg}
+          <div className={`mx-4 mt-3 px-3 py-2 rounded-lg text-xs flex items-center gap-2 ${justResearched ? 'text-green-300' : 'text-red-300'}`}
+            style={{
+              background: justResearched ? 'rgba(74,222,128,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${justResearched ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}`,
+            }}>
+            {justResearched ? <><Check size={12} /> {t.research.confirmed}</> : errorMsg}
           </div>
         )}
 
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-36 bg-gray-900/50 border-r border-gray-800 p-2 overflow-y-auto shrink-0">
-            {BRANCHES.map(branch => (
-              <button key={branch} onClick={() => setSelectedBranch(branch)}
-                className={`w-full flex items-center gap-1.5 px-2 py-2 rounded text-left text-xs font-medium mb-1 transition-colors ${selectedBranch === branch ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
-                <span>{BRANCH_ICONS[branch]}</span>
-                <span className="truncate">{t.tech[branch]}</span>
-              </button>
-            ))}
+          <div className="w-36 shrink-0 p-2 overflow-y-auto"
+            style={{ background: 'rgba(255,255,255,0.02)', borderRight: '1px solid rgba(255,255,255,0.07)' }}>
+            {BRANCHES.map(branch => {
+              const meta = BRANCH_META[branch];
+              const isActive = selectedBranch === branch;
+              return (
+                <button key={branch} onClick={() => setSelectedBranch(branch)}
+                  className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-left text-xs font-medium mb-1 transition-all"
+                  style={{
+                    background: isActive ? meta.color + '18' : 'transparent',
+                    border: isActive ? `1px solid ${meta.color}35` : '1px solid transparent',
+                    color: isActive ? meta.color : '#6b7280',
+                  }}>
+                  <span>{meta.icon}</span>
+                  <span className="truncate">{t.tech[branch]}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto">
+            <div className="flex items-center gap-2 mb-3">
+              <span>{activeMeta.icon}</span>
+              <p className="text-[9px] uppercase tracking-widest font-heading" style={{ color: activeMeta.color }}>{t.tech[selectedBranch]}</p>
+            </div>
             <div className="space-y-2">
               {branchTechs.map(([techId, techData]) => {
                 const status = getTechStatus(techId);
                 const isExp = expanded === techId;
                 const labLabel = t.research[LAB_LABELS[techData.labRequired] ?? 'noLab'];
                 return (
-                  <div key={techId} className={`rounded-lg border transition-all ${status === 'researched' ? 'border-green-700/30 bg-green-900/10 opacity-60' : status === 'available' ? 'border-purple-600/50 bg-purple-900/10' : status === 'unaffordable' ? 'border-yellow-700/30 bg-yellow-900/5' : 'border-gray-700/40 bg-gray-800/20'}`}>
-                    <button className="w-full flex items-center gap-2 p-3 text-left" onClick={() => setExpanded(isExp ? null : techId)}>
-                      <span>{status === 'researched' ? '✅' : status === 'available' ? '🔬' : status === 'unaffordable' ? '💸' : '🔒'}</span>
+                  <div key={techId} className="rounded-xl overflow-hidden transition-all"
+                    style={{
+                      background: status === 'researched' ? 'rgba(74,222,128,0.05)' : status === 'available' ? activeMeta.color + '10' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${status === 'researched' ? 'rgba(74,222,128,0.2)' : status === 'available' ? activeMeta.color + '35' : 'rgba(255,255,255,0.07)'}`,
+                      opacity: status === 'researched' ? 0.7 : 1,
+                    }}>
+                    <button className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left"
+                      onClick={() => setExpanded(isExp ? null : techId)}>
+                      <span className="text-base shrink-0">
+                        {status === 'researched' ? '✅' : status === 'available' ? '🔬' : status === 'unaffordable' ? '💸' : '🔒'}
+                      </span>
                       <span className="flex-1 font-medium text-sm text-white">{t.tech[techId] || techId}</span>
-                      <span className="text-xs text-gray-500 shrink-0">🔬 {techData.cost.science}</span>
-                      {isExp ? <ChevronUp size={12} className="text-gray-500" /> : <ChevronDown size={12} className="text-gray-500" />}
+                      <span className="text-xs font-mono text-gray-500 shrink-0">🔬 {techData.cost.science}</span>
+                      {isExp ? <ChevronUp size={12} className="text-gray-600 shrink-0" /> : <ChevronDown size={12} className="text-gray-600 shrink-0" />}
                     </button>
                     {isExp && (
-                      <div className="px-3 pb-3 border-t border-gray-700/30 pt-2 space-y-2">
-                        <p className="text-gray-300 text-xs">{lang === 'ko' ? techData.effectDescKo : techData.effectDesc}</p>
+                      <div className="px-3 pb-3 space-y-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                        <p className="text-gray-400 text-xs pt-2 leading-relaxed">{lang === 'ko' ? techData.effectDescKo : techData.effectDesc}</p>
                         {techData.prerequisites.length > 0 && (
-                          <p className="text-gray-500 text-xs">{t.research.prerequisites}: {techData.prerequisites.map(p => t.tech[p] || p).join(', ')}</p>
+                          <p className="text-gray-600 text-[11px]">{t.research.prerequisites}: {techData.prerequisites.map(p => t.tech[p] || p).join(', ')}</p>
                         )}
-                        <p className="text-gray-500 text-xs">{t.research.labRequired}: {labLabel}</p>
+                        <p className="text-gray-600 text-[11px]">{t.research.labRequired}: {labLabel}</p>
                         {status === 'available' && (
                           <button onClick={() => handleResearch(techId)}
-                            className="w-full py-1.5 bg-purple-600/40 hover:bg-purple-600/60 text-purple-200 rounded text-xs font-medium transition-colors">
+                            className="w-full py-1.5 rounded-lg text-xs font-heading font-bold transition-all"
+                            style={{ background: activeMeta.color + '20', border: `1px solid ${activeMeta.color}40`, color: activeMeta.color }}>
                             {t.research.researchBtn} (🔬 {techData.cost.science})
                           </button>
                         )}
                         {status === 'unaffordable' && <p className="text-yellow-400 text-xs">{t.research.notEnoughScience}</p>}
-                        {status === 'locked' && !player.technologies.includes(techId) && (
-                          <p className="text-gray-500 text-xs">
+                        {status === 'locked' && (
+                          <p className="text-gray-600 text-xs">
                             {techData.labRequired && labLevel < techData.labRequired
                               ? (techData.labRequired === 2 ? t.research.advancedLabMissing : t.research.labMissing)
                               : t.research.prerequisitesMissing}
@@ -237,11 +297,8 @@ function SeniorResearchPanel({ onClose }) {
   );
 }
 
-// ---- Exported wrapper ----
 export default function ResearchPanel({ onClose }) {
   const { gameState } = useGame();
   const isJunior = gameState?.settings?.gradeMode === 'junior';
-  return isJunior
-    ? <JuniorResearchPanel onClose={onClose} />
-    : <SeniorResearchPanel onClose={onClose} />;
+  return isJunior ? <JuniorResearchPanel onClose={onClose} /> : <SeniorResearchPanel onClose={onClose} />;
 }

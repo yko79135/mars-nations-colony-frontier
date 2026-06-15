@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
-import { Trophy, Medal, Star, Rocket, BookOpen } from 'lucide-react';
+import { Trophy, Medal, BookOpen, Rocket, RotateCcw } from 'lucide-react';
 import { GRADE_MODES } from '@/lib/gameModes';
 
 const REFLECTION_QUESTIONS = {
@@ -23,9 +23,11 @@ const REFLECTION_QUESTIONS = {
 
 const SCORE_LABELS_EN = {
   territory: 'Territory', science: 'Science', population: 'Population',
-  livingConditions: 'Living', economic: 'Economy', cooperation: 'Cooperation',
-  sustainability: 'Sustainability', achievement: 'Achievement',
+  livingConditions: 'Living', economic: 'Economy', cooperation: 'Coop',
+  sustainability: 'Sustain', achievement: 'Achieve',
 };
+
+const AWARD_ICONS = ['🌡️', '🔬', '🌿', '💰', '🤝', '🗺️'];
 
 export default function VictoryScreen() {
   const { t, lang } = useLang();
@@ -38,17 +40,18 @@ export default function VictoryScreen() {
   const modeData = GRADE_MODES[gradeMode];
 
   const sorted = [...players].sort((a, b) => {
-    const totalA = Object.values(a.scores).reduce((s, v) => s + (v || 0), 0);
-    const totalB = Object.values(b.scores).reduce((s, v) => s + (v || 0), 0);
-    return totalB - totalA;
+    const ta = Object.values(a.scores).reduce((s, v) => s + (v || 0), 0);
+    const tb = Object.values(b.scores).reduce((s, v) => s + (v || 0), 0);
+    return tb - ta;
   });
+  const winner = sorted[0];
 
   const awards = [
-    { label: t.victory.bestLiving, winner: [...players].sort((a, b) => (b.scores.livingConditions || 0) - (a.scores.livingConditions || 0))[0] },
-    { label: t.victory.greatestScience, winner: [...players].sort((a, b) => (b.scores.science || 0) - (a.scores.science || 0))[0] },
-    { label: t.victory.mostSustainable, winner: [...players].sort((a, b) => (b.scores.sustainability || 0) - (a.scores.sustainability || 0))[0] },
+    { label: t.victory.bestLiving,       winner: [...players].sort((a, b) => (b.scores.livingConditions || 0) - (a.scores.livingConditions || 0))[0] },
+    { label: t.victory.greatestScience,  winner: [...players].sort((a, b) => (b.scores.science || 0) - (a.scores.science || 0))[0] },
+    { label: t.victory.mostSustainable,  winner: [...players].sort((a, b) => (b.scores.sustainability || 0) - (a.scores.sustainability || 0))[0] },
     { label: t.victory.strongestEconomy, winner: [...players].sort((a, b) => (b.scores.economic || 0) - (a.scores.economic || 0))[0] },
-    { label: t.victory.bestPartner, winner: [...players].sort((a, b) => (b.scores.cooperation || 0) - (a.scores.cooperation || 0))[0] },
+    { label: t.victory.bestPartner,      winner: [...players].sort((a, b) => (b.scores.cooperation || 0) - (a.scores.cooperation || 0))[0] },
     { label: t.victory.largestTerritory, winner: [...players].sort((a, b) => (b.scores.territory || 0) - (a.scores.territory || 0))[0] },
   ];
 
@@ -61,83 +64,125 @@ export default function VictoryScreen() {
   const questions = REFLECTION_QUESTIONS[lang] || REFLECTION_QUESTIONS.en;
 
   return (
-    <div className="h-full overflow-y-auto bg-gradient-to-b from-gray-950 via-gray-900 to-red-950 p-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-6">
-          <Trophy size={44} className="text-yellow-400 mx-auto mb-3" />
+    <div className="h-full overflow-y-auto" style={{ background: 'linear-gradient(180deg, #04080f 0%, #0d0a1a 40%, #160810 100%)' }}>
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+
+        {/* Hero */}
+        <div className="text-center rounded-2xl py-8 px-6"
+          style={{
+            background: winner ? `linear-gradient(135deg, ${winner.colorHex}14, rgba(4,8,15,0.98))` : 'rgba(8,12,25,0.98)',
+            border: `1px solid ${winner?.colorHex || '#ffffff'}30`,
+            boxShadow: winner ? `0 0 60px ${winner.colorHex}20` : 'none',
+          }}>
+          <div className="text-6xl mb-3">🏆</div>
           <h1 className="text-3xl font-display font-bold text-white mb-1">{t.victory.gameOver}</h1>
-          <p className="text-gray-400 text-sm">
+          <p className="text-gray-500 text-sm mb-4">
             {lang === 'ko' ? modeData?.labelKo : modeData?.label} · {t.general.round} {gameState.currentRound}
           </p>
+          {winner && (
+            <div className="inline-flex items-center gap-3 px-5 py-3 rounded-2xl"
+              style={{ background: winner.colorHex + '18', border: `1px solid ${winner.colorHex}40` }}>
+              <span className="text-4xl">{winner.emblem}</span>
+              <div className="text-left">
+                <p className="font-heading font-bold text-base leading-tight" style={{ color: winner.colorHex }}>{winner.countryName}</p>
+                <p className="text-gray-400 text-xs">{winner.playerName}</p>
+              </div>
+              <span className="text-2xl font-mono font-bold text-white ml-2">
+                {Object.values(winner.scores).reduce((s, v) => s + (v || 0), 0)}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-5 mb-4">
-          <h2 className="text-white font-heading font-bold mb-4">{t.victory.rankings}</h2>
-          <div className="space-y-2">
+        {/* Rankings */}
+        <div className="rounded-2xl overflow-hidden"
+          style={{ background: 'rgba(8,12,25,0.98)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="px-5 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <h2 className="text-white font-heading font-bold text-sm">{t.victory.rankings}</h2>
+          </div>
+          <div className="p-4 space-y-2">
             {sorted.map((player, rank) => {
               const total = Object.values(player.scores).reduce((s, v) => s + (v || 0), 0);
               return (
-                <div key={player.index} className={`flex items-center gap-3 p-3 rounded-lg ${rank === 0 ? 'bg-yellow-900/20 border border-yellow-700/40' : rank === 1 ? 'bg-gray-700/20 border border-gray-600/30' : rank === 2 ? 'bg-amber-900/10 border border-amber-800/20' : 'bg-gray-800/30'}`}>
-                  <span className="text-xl w-8 text-center">{rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}.`}</span>
-                  <span className="text-2xl">{player.emblem}</span>
+                <div key={player.index} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                  style={{
+                    background: rank === 0 ? player.colorHex + '14' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${rank === 0 ? player.colorHex + '35' : 'rgba(255,255,255,0.06)'}`,
+                  }}>
+                  <span className="text-xl w-8 text-center shrink-0">{['🥇','🥈','🥉'][rank] || `${rank+1}.`}</span>
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg shrink-0"
+                    style={{ background: player.colorHex + '22', border: `2px solid ${player.colorHex}` }}>{player.emblem}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-heading font-semibold text-sm" style={{ color: player.colorHex }}>{player.countryName}</p>
-                    <p className="text-gray-500 text-xs">{player.playerName}</p>
+                    <p className="font-heading font-bold text-sm leading-tight" style={{ color: player.colorHex }}>{player.countryName}</p>
+                    <p className="text-gray-600 text-[10px]">{player.playerName}</p>
                   </div>
-                  <div className="hidden sm:flex gap-1 text-[10px] text-gray-500 font-mono">
+                  <div className="hidden sm:flex gap-1 flex-wrap justify-end max-w-[140px]">
                     {Object.entries(player.scores).map(([k, v]) => (
-                      <span key={k} className="px-1 bg-gray-800/60 rounded" title={SCORE_LABELS_EN[k]}>{v || 0}</span>
+                      <span key={k} className="text-[9px] font-mono px-1.5 py-0.5 rounded text-gray-500"
+                        style={{ background: 'rgba(255,255,255,0.06)' }} title={SCORE_LABELS_EN[k]}>{v || 0}</span>
                     ))}
                   </div>
-                  <span className="text-white font-bold text-xl font-mono ml-1">{total}</span>
+                  <span className="text-white font-mono font-bold text-lg ml-1 shrink-0">{total}</span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-5 mb-4">
-          <h2 className="text-white font-heading font-bold mb-3 flex items-center gap-2">
-            <Medal size={16} className="text-orange-400" />
-            {t.victory.awards}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {/* Awards */}
+        <div className="rounded-2xl overflow-hidden"
+          style={{ background: 'rgba(8,12,25,0.98)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <Medal size={14} className="text-orange-400" />
+            <h2 className="text-white font-heading font-bold text-sm">{t.victory.awards}</h2>
+          </div>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
             {awards.map((award, i) => (
-              <div key={i} className="flex items-center gap-2 bg-gray-800/40 rounded-lg p-2.5">
-                <Star size={13} className="text-yellow-400 shrink-0" />
-                <div>
-                  <p className="text-gray-400 text-xs">{award.label}</p>
-                  <p className="text-white text-sm font-medium">{award.winner?.emblem} {award.winner?.countryName}</p>
+              <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span className="text-xl shrink-0">{AWARD_ICONS[i] || '⭐'}</span>
+                <div className="min-w-0">
+                  <p className="text-gray-500 text-[10px] leading-tight">{award.label}</p>
+                  <p className="text-white text-xs font-medium leading-tight truncate">{award.winner?.emblem} {award.winner?.countryName}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-5 mb-6">
-          <h2 className="text-white font-heading font-bold mb-3 flex items-center gap-2">
-            <BookOpen size={16} className="text-blue-400" />
-            {lang === 'ko' ? '토론 질문' : 'Discussion Questions'}
-          </h2>
-          <ol className="space-y-2">
-            {questions.map((q, i) => (
-              <li key={i} className="flex gap-2 text-sm text-gray-300">
-                <span className="text-orange-400 font-bold shrink-0">{i + 1}.</span>
-                <span>{q}</span>
-              </li>
-            ))}
-          </ol>
+        {/* Discussion questions */}
+        <div className="rounded-2xl overflow-hidden"
+          style={{ background: 'rgba(8,12,25,0.98)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <BookOpen size={14} className="text-blue-400" />
+            <h2 className="text-white font-heading font-bold text-sm">{lang === 'ko' ? '토론 질문' : 'Discussion Questions'}</h2>
+          </div>
+          <div className="p-4">
+            <ol className="space-y-2.5">
+              {questions.map((q, i) => (
+                <li key={i} className="flex gap-3 text-sm">
+                  <span className="text-orange-500 font-heading font-bold shrink-0 w-5">{i + 1}.</span>
+                  <span className="text-gray-300 leading-relaxed">{q}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
 
-        <div className="flex gap-3 justify-center">
-          <button onClick={handleNewGame} className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-heading font-semibold transition-colors flex items-center gap-2">
-            <Rocket size={16} />
-            {t.victory.newGame}
+        {/* Actions */}
+        <div className="flex gap-3 justify-center pb-4">
+          <button onClick={handleNewGame}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl font-heading font-bold text-sm text-white transition-all"
+            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <RotateCcw size={15} /> {t.victory.newGame}
           </button>
-          <button onClick={handleContinue} className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-heading font-semibold transition-colors">
-            {t.victory.continuePlay}
+          <button onClick={handleContinue}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl font-heading font-bold text-sm text-white transition-all"
+            style={{ background: 'linear-gradient(135deg, #ea580c, #c2410c)', border: '1px solid rgba(251,146,60,0.4)', boxShadow: '0 4px 16px rgba(234,88,12,0.35)' }}>
+            <Rocket size={15} /> {t.victory.continuePlay}
           </button>
         </div>
+
       </div>
     </div>
   );
