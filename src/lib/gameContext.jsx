@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel, isExploredByNation, canExploreHex, canClaimHex } from './gameData';
+import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel, isExploredByNation, canExploreHex, canClaimHex, DIPLOMACY_RESOURCES, getTrust, adjustTrust } from './gameData';
 import { JUNIOR_TECHS } from './gameModes';
 
 const GameContext = createContext();
@@ -243,6 +243,203 @@ export function GameProvider({ children }) {
     });
   }, []);
 
+  // ---- DIPLOMACY ----
+
+  let nextProposalId = 1;
+  const genProposalId = () => `prop_${Date.now()}_${nextProposalId++}`;
+  let nextAgreementId = 1;
+  const genAgreementId = () => `agr_${Date.now()}_${nextAgreementId++}`;
+
+  const proposeAgreement = useCallback((type, recipientIndex, data) => {
+    setGameState(prev => {
+      if (!prev || prev.actionPoints <= 0) return prev;
+      const pidx = prev.currentPlayerIndex;
+      if (recipientIndex === pidx) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+
+      // Prevent duplicate active alliances
+      if (type === 'alliance') {
+        const existing = next.diplomacy.agreements.find(a =>
+          a.type === 'alliance' && a.status === 'active' &&
+          a.nationIds.includes(pidx) && a.nationIds.includes(recipientIndex)
+        );
+        if (existing) return prev;
+        const pending = next.diplomacy.proposals.find(p =>
+          p.type === 'alliance' && p.status === 'pending' &&
+          ((p.proposerIndex === pidx && p.recipientIndex === recipientIndex) ||
+           (p.proposerIndex === recipientIndex && p.recipientIndex === pidx))
+        );
+        if (pending) return prev;
+      }
+
+      const proposal = {
+        id: genProposalId(),
+        type,
+        proposerIndex: pidx,
+        recipientIndex,
+        status: 'pending',
+        createdRound: next.currentRound,
+        ...data,
+      };
+
+      next.diplomacy.proposals.push(proposal);
+      next.actionPoints -= 1;
+      return next;
+    });
+  }, []);
+
+  const acceptProposal = useCallback((proposalId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) return prev;
+      const propIdx = next.diplomacy.proposals.findIndex(p => p.id === proposalId);
+      if (propIdx === -1) return prev;
+      const proposal = next.diplomacy.proposals[propIdx];
+      if (proposal.status !== 'pending') return prev;
+      const pidx = next.currentPlayerIndex;
+      if (proposal.recipientIndex !== pidx) return prev;
+
+      const proposer = next.players[proposal.proposerIndex];
+      const recipient = next.players[pidx];
+
+      // Validate resources for trade
+      if (proposal.type === 'trade') {
+        const offered = proposal.offeredResources || {};
+        const requested = proposal.requestedResources || {};
+        for (const [res, amt] of Object.entries(offered)) {
+          if ((proposer.resources[res] || 0) < amt) return prev;
+        }
+        for (const [res, amt] of Object.entries(requested)) {
+          if ((recipient.resources[res] || 0) < amt) return prev;
+        }
+        // Transfer resources
+        for (const [res, amt] of Object.entries(offered)) {
+          proposer.resources[res] -= amt;
+          recipient.resources[res] = (recipient.resources[res] || 0) + amt;
+        }
+        for (const [res, amt] of Object.entries(requested)) {
+          recipient.resources[res] -= amt;
+          proposer.resources[res] = (proposer.resources[res] || 0) + amt;
+        }
+        const trustGain = Object.keys(offered).length + Object.keys(requested).length > 0 ? 5 : 0;
+        adjustTrust(next, proposal.proposerIndex, pidx, trustGain);
+      }
+
+      // Alliance
+      if (proposal.type === 'alliance') {
+        const agreement = {
+          id: genAgreementId(),
+          type: 'alliance',
+          nationIds: [proposal.proposerIndex, pidx],
+          startRound: next.currentRound,
+          duration: proposal.duration || 5,
+          status: 'active',
+        };
+        next.diplomacy.agreements.push(agreement);
+        adjustTrust(next, proposal.proposerIndex, pidx, 10);
+        proposer.scores.cooperation = (proposer.scores.cooperation || 0) + 10;
+        recipient.scores.cooperation = (recipient.scores.cooperation || 0) + 10;
+      }
+
+      // Non-aggression
+      if (proposal.type === 'nonAggression') {
+        const agreement = {
+          id: genAgreementId(),
+          type: 'nonAggression',
+          nationIds: [proposal.proposerIndex, pidx],
+          startRound: next.currentRound,
+          duration: proposal.pactDuration || 5,
+          status: 'active',
+        };
+        next.diplomacy.agreements.push(agreement);
+        adjustTrust(next, proposal.proposerIndex, pidx, 5);
+        proposer.scores.cooperation = (proposer.scores.cooperation || 0) + 5;
+        recipient.scores.cooperation = (recipient.scores.cooperation || 0) + 5;
+      }
+
+      // Tech share
+      if (proposal.type === 'shareTech') {
+        const techId = proposal.techId;
+        if (!recipient.technologies.includes(techId)) {
+          if (!recipient.techCostReductions) recipient.techCostReductions = {};
+          recipient.techCostReductions[techId] = 0.5;
+        }
+        adjustTrust(next, proposal.proposerIndex, pidx, 5);
+        proposer.scores.cooperation = (proposer.scores.cooperation || 0) + 5;
+      }
+
+      // Emergency aid
+      if (proposal.type === 'emergencyAid') {
+        const resource = proposal.aidResource;
+        const amount = proposal.aidAmount;
+        if ((proposer.resources[resource] || 0) < amount) return prev;
+        proposer.resources[resource] -= amount;
+        recipient.resources[resource] = (recipient.resources[resource] || 0) + amount;
+        adjustTrust(next, proposal.proposerIndex, pidx, 10);
+        proposer.scores.cooperation = (proposer.scores.cooperation || 0) + 8;
+      }
+
+      proposal.status = 'accepted';
+      next.diplomacy.history.push({ ...proposal, resolvedRound: next.currentRound });
+      next.diplomacy.proposals.splice(propIdx, 1);
+      return next;
+    });
+  }, []);
+
+  const rejectProposal = useCallback((proposalId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) return prev;
+      const propIdx = next.diplomacy.proposals.findIndex(p => p.id === proposalId);
+      if (propIdx === -1) return prev;
+      const proposal = next.diplomacy.proposals[propIdx];
+      if (proposal.status !== 'pending') return prev;
+      if (proposal.recipientIndex !== next.currentPlayerIndex) return prev;
+      proposal.status = 'rejected';
+      // Slight trust penalty for repeated rejections
+      adjustTrust(next, proposal.proposerIndex, next.currentPlayerIndex, -2);
+      next.diplomacy.history.push({ ...proposal, resolvedRound: next.currentRound });
+      next.diplomacy.proposals.splice(propIdx, 1);
+      return next;
+    });
+  }, []);
+
+  const withdrawProposal = useCallback((proposalId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) return prev;
+      const propIdx = next.diplomacy.proposals.findIndex(p => p.id === proposalId);
+      if (propIdx === -1) return prev;
+      const proposal = next.diplomacy.proposals[propIdx];
+      if (proposal.proposerIndex !== next.currentPlayerIndex) return prev;
+      proposal.status = 'withdrawn';
+      next.diplomacy.history.push({ ...proposal, resolvedRound: next.currentRound });
+      next.diplomacy.proposals.splice(propIdx, 1);
+      return next;
+    });
+  }, []);
+
+  const cancelAgreement = useCallback((agreementId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) return prev;
+      const agr = next.diplomacy.agreements.find(a => a.id === agreementId);
+      if (!agr || agr.status !== 'active') return prev;
+      if (!agr.nationIds.includes(next.currentPlayerIndex)) return prev;
+      agr.status = 'cancelled';
+      adjustTrust(next, agr.nationIds[0], agr.nationIds[1], -15);
+      next.players[agr.nationIds[0]].scores.cooperation = Math.max(0, (next.players[agr.nationIds[0]].scores.cooperation || 0) - 5);
+      next.players[agr.nationIds[1]].scores.cooperation = Math.max(0, (next.players[agr.nationIds[1]].scores.cooperation || 0) - 5);
+      next.diplomacy.history.push({ ...agr, cancelledRound: next.currentRound, cancelledBy: next.currentPlayerIndex });
+      return next;
+    });
+  }, []);
+
   // ---- TURN MANAGEMENT ----
 
   const endTurn = useCallback(() => {
@@ -319,6 +516,30 @@ export function GameProvider({ children }) {
           }
         }
 
+        // Expire agreements + alliance trust maintenance
+        if (next.diplomacy) {
+          next.diplomacy.agreements = next.diplomacy.agreements.map(a => {
+            if (a.status !== 'active') return a;
+            const elapsed = next.currentRound - a.startRound;
+            if (elapsed >= a.duration) {
+              if (a.type === 'alliance') {
+                // Alliance expired — move to history
+                next.diplomacy.history.push({ ...a, expiredRound: next.currentRound, status: 'completed' });
+                return { ...a, status: 'completed' };
+              }
+              if (a.type === 'nonAggression') {
+                next.diplomacy.history.push({ ...a, expiredRound: next.currentRound, status: 'completed' });
+                return { ...a, status: 'completed' };
+              }
+            }
+            // Alliance maintenance: +2 trust per round
+            if (a.type === 'alliance' && a.status === 'active') {
+              adjustTrust(next, a.nationIds[0], a.nationIds[1], 2);
+            }
+            return a;
+          });
+        }
+
         if (next.currentRound > (next.settings.gameLength || 20)) {
           next.gameOver = true;
         }
@@ -371,6 +592,7 @@ export function GameProvider({ children }) {
       gameState, screen, setScreen,
       startGame, updateGameState,
       exploreHex, claimHex, buildOnHex, researchTech, giveResource,
+      proposeAgreement, acceptProposal, rejectProposal, withdrawProposal, cancelAgreement,
       endTurn, dismissEvent,
       saveGame, loadGame, getSavedGames, deleteSave,
       // Camera API — stable, never touched by game actions

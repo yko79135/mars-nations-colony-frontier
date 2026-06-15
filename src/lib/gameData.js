@@ -243,6 +243,48 @@ export const TECH_TREE = {
 };
 
 // ============ EVENTS ============
+// ============ DIPLOMACY / TRUST ============
+
+export const TRUST_LABELS = {
+  hostile:  { min: 0,  max: 20, en: 'Hostile',        ko: '적대적' },
+  poor:     { min: 21, max: 40, en: 'Poor',           ko: '좋지 않음' },
+  neutral:  { min: 41, max: 60, en: 'Neutral',        ko: '중립' },
+  friendly: { min: 61, max: 80, en: 'Friendly',       ko: '우호적' },
+  trusted:  { min: 81, max: 100, en: 'Trusted',       ko: '신뢰함' },
+};
+
+export function getTrustLabel(value) {
+  for (const [key, range] of Object.entries(TRUST_LABELS)) {
+    if (value >= range.min && value <= range.max) return key;
+  }
+  return 'neutral';
+}
+
+export function getTrustKey(a, b) {
+  const min = Math.min(a, b), max = Math.max(a, b);
+  return `${min}:${max}`;
+}
+
+export function getTrust(gameState, a, b) {
+  if (!gameState?.diplomacy?.trust) return 50;
+  return gameState.diplomacy.trust[getTrustKey(a, b)] ?? 50;
+}
+
+export function setTrust(gameState, a, b, value) {
+  if (!gameState.diplomacy) gameState.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+  if (!gameState.diplomacy.trust) gameState.diplomacy.trust = {};
+  gameState.diplomacy.trust[getTrustKey(a, b)] = Math.max(0, Math.min(100, value));
+}
+
+export function adjustTrust(gameState, a, b, delta) {
+  const current = getTrust(gameState, a, b);
+  setTrust(gameState, a, b, current + delta);
+}
+
+export const DIPLOMACY_RESOURCES = ['energy', 'water', 'food', 'minerals', 'science'];
+
+// ============ EVENTS ============
+
 export const EVENTS = [
   { id: 'dustStorm',        type: 'negative', scope: 'single', effects: { energy: -3 } },
   { id: 'solarStorm',       type: 'negative', scope: 'all',    effects: { morale: -2 } },
@@ -545,6 +587,12 @@ export function createInitialGameState(settings, nations) {
     activeEvent: null,
     turnHistory: [],
     gameOver: false,
+    diplomacy: {
+      proposals: [],
+      agreements: [],
+      history: [],
+      trust: {},
+    },
   };
 }
 
