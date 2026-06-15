@@ -123,31 +123,52 @@ export default function JuniorGameScreen() {
   const hexForTooltip = selectedHex && !buildMenu && !actionMode ? selectedHex : null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] bg-gray-950">
+    <div className="flex flex-col h-[calc(100vh-48px)]" style={{ background: '#04080f' }}>
       {/* Top info bar */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-900/90 border-b border-gray-800 text-xs flex-wrap shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2 text-xs flex-wrap shrink-0"
+        style={{ background: 'rgba(8,12,25,0.97)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        {/* Nation badge */}
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded flex items-center justify-center text-lg" style={{ backgroundColor: player.colorHex + '25', border: `2px solid ${player.colorHex}` }}>{player.emblem}</div>
-          <span className="text-white font-heading font-semibold">{player.countryName}</span>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg shadow-lg"
+            style={{
+              background: player.colorHex + '22',
+              border: `2px solid ${player.colorHex}`,
+              boxShadow: `0 0 8px ${player.colorHex}44`,
+            }}>{player.emblem}</div>
+          <div>
+            <div className="text-white font-heading font-bold text-xs leading-tight">{player.countryName}</div>
+            <div className="text-[9px] leading-tight" style={{ color: player.colorHex + 'bb' }}>🏴 {player.colonyName}</div>
+          </div>
         </div>
-        <div className="h-4 w-px bg-gray-700" />
-        <span className="text-gray-400">
-          {t.general.round} <span className="text-white font-bold">{gameState.currentRound}</span>/{gameState.settings.gameLength}
-        </span>
-        <div className="h-4 w-px bg-gray-700" />
-        <span className="text-gray-400">{t.actions.actionPoints}:</span>
-        {Array.from({ length: gameState.settings.actionPointsPerTurn || 3 }).map((_, i) => (
-          <div key={i} className={`w-3 h-3 rounded-full border ${i < ap ? 'bg-orange-500 border-orange-400' : 'bg-gray-800 border-gray-600'}`} />
-        ))}
+        {/* Divider */}
+        <div className="h-6 w-px mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        {/* Round */}
+        <div className="flex items-center gap-1">
+          <span className="text-gray-500">{t.general.round}</span>
+          <span className="text-white font-bold">{gameState.currentRound}</span>
+          <span className="text-gray-600">/{gameState.settings.gameLength}</span>
+        </div>
+        <div className="h-6 w-px mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        {/* Action points */}
+        <div className="flex items-center gap-1">
+          <span className="text-gray-500 text-[10px]">AP</span>
+          {Array.from({ length: gameState.settings.actionPointsPerTurn || 3 }).map((_, i) => (
+            <div key={i} className={`w-3 h-3 rounded-full transition-all ${i < ap ? 'bg-orange-500' : 'bg-gray-800 border border-gray-700'}`}
+              style={i < ap ? { boxShadow: '0 0 5px rgba(249,115,22,0.5)' } : {}} />
+          ))}
+        </div>
+        {/* Resource strip */}
         <div className="ml-auto flex items-center gap-3">
           {RESOURCE_META.map(m => {
             const val = player.resources[m.key] || 0;
             const low = val <= 3;
             return (
-              <span key={m.key} className={`${m.color} font-mono font-bold ${low ? 'animate-pulse' : ''}`} title={m.label}>
-                {m.icon}{val}
-                {low && <span className="text-red-400 text-[9px] ml-0.5">!</span>}
-              </span>
+              <div key={m.key} className={`flex items-center gap-0.5 ${low ? 'animate-pulse' : ''}`}
+                style={{ color: low ? '#f87171' : m.color }} title={m.label}>
+                <span>{m.icon}</span>
+                <span className="font-mono font-bold text-xs">{val}</span>
+                {low && <span className="text-[8px] text-red-400">!</span>}
+              </div>
             );
           })}
         </div>
@@ -158,24 +179,24 @@ export default function JuniorGameScreen() {
         <div className="flex-1 relative">
           {/* Action mode banner */}
           {actionMode && (
-            <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between gap-2 bg-gray-900/95 border border-orange-500/50 rounded-lg px-3 py-2 text-xs shadow-lg">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-                <span className="text-white">
-                  {actionMode === 'explore' && `🔭 ${t.actions.explore} — ${t.general.selectHex}`}
-                  {actionMode === 'claim'   && `🏴 ${t.actions.claim} — ${t.general.selectHex}`}
-                  {actionMode === 'build'   && `🏗️ ${t.actions.build} — ${t.general.selectHex}`}
-                </span>
-              </div>
-              <button onClick={() => { setActionMode(null); setActionMsg(''); }} className="text-gray-400 hover:text-white flex items-center gap-1">
-                <X size={14} /> {t.actions.cancelAction}
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full text-xs shadow-2xl"
+              style={{ background: 'rgba(10,14,30,0.97)', border: '1px solid rgba(249,115,22,0.5)', boxShadow: '0 0 16px rgba(249,115,22,0.2)' }}>
+              <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+              <span className="text-white">
+                {actionMode === 'explore' && `🔭 ${t.actions.explore} — ${t.general.selectHex}`}
+                {actionMode === 'claim'   && `🏴 ${t.actions.claim} — ${t.general.selectHex}`}
+                {actionMode === 'build'   && `🏗️ ${t.actions.build} — ${t.general.selectHex}`}
+              </span>
+              <button onClick={() => { setActionMode(null); setActionMsg(''); }} className="text-gray-500 hover:text-white flex items-center gap-0.5 ml-1 transition-colors">
+                <X size={12} />
               </button>
             </div>
           )}
           {actionMsg && !actionMode && (
-            <div className="absolute top-2 left-2 right-2 z-10 bg-gray-900/95 border border-yellow-600/50 rounded-lg px-3 py-2 text-xs text-yellow-300 shadow-lg flex items-center justify-between">
-              <span>⚠️ {actionMsg}</span>
-              <button onClick={() => setActionMsg('')} className="text-gray-400 hover:text-white"><X size={14} /></button>
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full text-xs shadow-2xl"
+              style={{ background: 'rgba(10,14,30,0.97)', border: '1px solid rgba(234,179,8,0.4)' }}>
+              <span className="text-yellow-300">⚠️ {actionMsg}</span>
+              <button onClick={() => setActionMsg('')} className="text-gray-500 hover:text-white transition-colors"><X size={12} /></button>
             </div>
           )}
 
@@ -199,76 +220,97 @@ export default function JuniorGameScreen() {
           <JuniorMapLegend />
         </div>
 
-        {/* Right panel: actions + scores + help */}
-        <div className="w-48 bg-gray-900/95 border-l border-gray-700 flex flex-col shrink-0 overflow-y-auto">
+        {/* Right panel: actions + scores */}
+        <div className="w-48 flex flex-col shrink-0 overflow-y-auto"
+          style={{ background: 'rgba(8,12,25,0.97)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
+
           {/* Building guide shortcut */}
-          <button
-            onClick={() => setShowBuildGuide(true)}
-            className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-gray-800 border-b border-gray-800 transition-colors"
-          >
-            <BookOpen size={13} />
-            <span>{lang === 'ko' ? '건물 안내 보기' : 'Building Guide'}</span>
+          <button onClick={() => setShowBuildGuide(true)}
+            className="flex items-center gap-2 px-3 py-2.5 text-xs text-gray-500 hover:text-gray-200 transition-colors"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <BookOpen size={12} />
+            <span>{lang === 'ko' ? '건물 안내' : 'Building Guide'}</span>
           </button>
 
-          <div className="p-2 space-y-1.5">
+          {/* Action buttons */}
+          <div className="p-2 space-y-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="text-[9px] text-gray-600 uppercase tracking-widest px-1 mb-1">
+              {lang === 'ko' ? '행동 선택' : 'Actions'}
+            </div>
             {ACTIONS.map(action => {
               const isActive = actionMode === action.key;
               const disabled = ap <= 0 && action.ap > 0;
+              const ACTION_COLORS = {
+                explore: { active: 'rgba(96,165,250,0.2)', border: 'rgba(96,165,250,0.5)', text: '#93c5fd' },
+                claim:   { active: 'rgba(74,222,128,0.2)', border: 'rgba(74,222,128,0.5)', text: '#86efac' },
+                build:   { active: 'rgba(251,191,36,0.2)', border: 'rgba(251,191,36,0.5)', text: '#fde68a' },
+                research:{ active: 'rgba(167,139,250,0.2)', border: 'rgba(167,139,250,0.5)', text: '#c4b5fd' },
+                help:    { active: 'rgba(251,146,60,0.2)', border: 'rgba(251,146,60,0.5)', text: '#fed7aa' },
+              };
+              const ac = ACTION_COLORS[action.key];
               return (
                 <button key={action.key} onClick={() => handleAction(action.key)} disabled={disabled}
-                  className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-colors border text-sm font-medium ${
-                    isActive
-                      ? 'bg-orange-600/30 border-orange-500/60 text-orange-200'
-                      : disabled
-                        ? 'bg-gray-800/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
-                        : 'bg-gray-800/60 border-gray-700/40 text-gray-200 hover:bg-gray-700/60'
-                  }`}>
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all"
+                  style={{
+                    background: isActive ? ac.active : disabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${isActive ? ac.border : disabled ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.07)'}`,
+                    color: isActive ? ac.text : disabled ? 'rgba(107,114,128,1)' : 'rgba(209,213,219,1)',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    opacity: disabled ? 0.5 : 1,
+                  }}>
                   <span className="text-base">{action.emoji}</span>
-                  <span className="flex-1">{action.label}</span>
-                  {action.ap > 0 && (
-                    <span className={`text-[10px] font-mono ${disabled ? 'text-gray-600' : 'text-gray-500'}`}>
-                      {action.ap}AP
-                    </span>
-                  )}
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />}
+                  <span className="flex-1 text-xs font-medium">{action.label}</span>
+                  {action.ap > 0 && <span className="text-[9px] opacity-60">{action.ap}AP</span>}
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: ac.text }} />}
                 </button>
               );
             })}
 
-            <div className="pt-1">
-              <button onClick={endTurn} className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-heading font-bold text-sm transition-colors flex items-center justify-center gap-2">
-                <SkipForward size={15} />
-                {t.actions.endTurn}
-              </button>
-            </div>
+            <button onClick={endTurn}
+              className="w-full py-2.5 text-white rounded-xl font-heading font-bold text-sm transition-all mt-2 flex items-center justify-center gap-1.5"
+              style={{
+                background: 'linear-gradient(135deg, #ea580c, #c2410c)',
+                border: '1px solid rgba(251,146,60,0.4)',
+                boxShadow: '0 4px 12px rgba(234,88,12,0.3)',
+              }}>
+              <SkipForward size={13} />
+              {t.actions.endTurn}
+            </button>
           </div>
 
-          {/* Resource key */}
-          <div className="px-3 py-2 border-t border-gray-800">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-heading mb-1.5">
+          {/* Resource list */}
+          <div className="px-3 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="text-[9px] text-gray-600 uppercase tracking-widest mb-1.5">
               {lang === 'ko' ? '자원' : 'Resources'}
-            </p>
-            <div className="space-y-0.5">
-              {RESOURCE_META.map(m => (
-                <div key={m.key} className="flex items-center gap-1.5">
-                  <span className={`${m.color} text-xs font-mono w-5`}>{m.icon}</span>
-                  <span className="text-gray-400 text-[10px]">{m.label}</span>
-                  <span className={`ml-auto font-mono text-xs font-bold ${m.color}`}>{player.resources[m.key] || 0}</span>
-                </div>
-              ))}
+            </div>
+            <div className="space-y-1">
+              {RESOURCE_META.map(m => {
+                const val = player.resources[m.key] || 0;
+                const low = val <= 3;
+                return (
+                  <div key={m.key} className="flex items-center gap-1.5 py-0.5 px-1.5 rounded"
+                    style={{ background: low ? 'rgba(239,68,68,0.08)' : 'transparent' }}>
+                    <span className="text-xs">{m.icon}</span>
+                    <span className="text-[10px] text-gray-500 flex-1">{m.label}</span>
+                    <span className="font-mono text-xs font-bold" style={{ color: low ? '#f87171' : m.color }}>{val}</span>
+                    {low && <span className="text-[8px] text-red-400">!</span>}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Mini score display */}
-          <div className="mt-auto p-2 border-t border-gray-800">
-            <div className="text-[10px] text-gray-500 font-heading uppercase tracking-wider mb-1">
-              {lang === 'ko' ? '점수' : 'Score'}
+          {/* Score leaderboard */}
+          <div className="mt-auto px-3 py-2">
+            <div className="text-[9px] text-gray-600 uppercase tracking-widest mb-1.5">
+              {lang === 'ko' ? '점수 순위' : 'Standings'}
             </div>
             {scores.map((p, rank) => (
               <div key={p.index} className="flex items-center gap-1.5 py-0.5">
-                <span className="text-xs">{rank === 0 ? '🥇' : rank === 1 ? '🥈' : `${rank + 1}.`}</span>
-                <span className="text-xs" style={{ color: p.colorHex }}>{p.emblem} {p.abbreviation}</span>
-                <span className="ml-auto text-xs font-mono text-white">{p.total}</span>
+                <span className="text-xs">{rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}`}</span>
+                <span className="text-xs font-medium" style={{ color: p.colorHex }}>{p.emblem}</span>
+                <span className="text-[10px] text-gray-400 flex-1 truncate">{p.abbreviation}</span>
+                <span className="text-xs font-mono font-bold text-white">{p.total}</span>
               </div>
             ))}
           </div>

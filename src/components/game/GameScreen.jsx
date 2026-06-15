@@ -53,22 +53,23 @@ export default function GameScreen() {
 
       <div className="flex-1 relative">
         {actionMode && (
-          <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between bg-gray-900/95 border border-orange-500/50 rounded-lg px-3 py-2 shadow-lg">
-            <div className="flex items-center gap-2 text-xs text-white">
-              <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-              {actionMode === 'explore' && `🔭 ${t.actions.explore} — ${t.general.selectHex}`}
-              {actionMode === 'claim'   && `🏴 ${t.actions.claim} — ${t.general.selectHex}`}
-              {actionMode === 'build'   && `🏗️ ${t.actions.build} — ${t.general.selectHex}`}
-            </div>
-            <button onClick={() => { setActionMode(null); setActionMsg(''); }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1">
-              <X size={13} /> {t.actions.cancelAction}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3 px-4 py-2 rounded-full text-xs text-white shadow-2xl"
+            style={{ background: 'rgba(10,14,30,0.97)', border: '1px solid rgba(249,115,22,0.5)', boxShadow: '0 0 20px rgba(249,115,22,0.2)' }}>
+            <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+            {actionMode === 'explore' && `🔭 ${t.actions.explore} — ${t.general.selectHex}`}
+            {actionMode === 'claim'   && `🏴 ${t.actions.claim} — ${t.general.selectHex}`}
+            {actionMode === 'build'   && `🏗️ ${t.actions.build} — ${t.general.selectHex}`}
+            <button onClick={() => { setActionMode(null); setActionMsg(''); }}
+              className="ml-1 text-gray-500 hover:text-white flex items-center gap-0.5 transition-colors">
+              <X size={12} /> <span className="text-[10px]">{t.actions.cancelAction}</span>
             </button>
           </div>
         )}
         {actionMsg && !actionMode && (
-          <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between bg-gray-900/95 border border-yellow-600/50 rounded-lg px-3 py-2 shadow-lg">
-            <span className="text-xs text-yellow-300">⚠️ {actionMsg}</span>
-            <button onClick={() => setActionMsg('')} className="text-gray-400 hover:text-white"><X size={13} /></button>
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full text-xs shadow-2xl"
+            style={{ background: 'rgba(10,14,30,0.97)', border: '1px solid rgba(234,179,8,0.4)' }}>
+            <span className="text-yellow-300">⚠️ {actionMsg}</span>
+            <button onClick={() => setActionMsg('')} className="text-gray-500 hover:text-white"><X size={12} /></button>
           </div>
         )}
         <button onClick={() => setShowSave(true)} className="absolute bottom-3 left-3 z-10 w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600">
