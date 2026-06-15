@@ -52,21 +52,13 @@ export default function MainMenu() {
                   <div key={key} className="flex items-center justify-between bg-gray-800/60 rounded p-2">
                     <div className="text-left">
                       <p className="text-gray-200 text-sm font-medium">{key}</p>
-                      <p className="text-gray-500 text-xs">
-                        {t.general.round} {saves[key].currentRound}
-                      </p>
+                      <p className="text-gray-500 text-xs">{t.general.round} {saves[key].currentRound}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => loadGame(key)}
-                        className="px-3 py-1 bg-orange-600/30 text-orange-300 rounded text-xs hover:bg-orange-600/50"
-                      >
+                      <button onClick={() => loadGame(key)} className="px-3 py-1 bg-orange-600/30 text-orange-300 rounded text-xs hover:bg-orange-600/50">
                         {t.save.load}
                       </button>
-                      <button
-                        onClick={() => { deleteSave(key); setShowLoad(false); setTimeout(() => setShowLoad(true), 0); }}
-                        className="p-1 text-gray-500 hover:text-red-400"
-                      >
+                      <button onClick={() => { deleteSave(key); setShowLoad(false); setTimeout(() => setShowLoad(true), 0); }} className="p-1 text-gray-500 hover:text-red-400">
                         <Trash2 size={14} />
                       </button>
                     </div>

@@ -6,15 +6,15 @@ import { getActiveResources } from '@/lib/gameModes';
 import { Zap, Droplets, Wheat, Gem, FlaskConical, Coins, Users, Smile, Wind } from 'lucide-react';
 
 const RESOURCE_META = {
-  energy:     { icon: Zap,         color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
-  water:      { icon: Droplets,    color: 'text-blue-400',   bg: 'bg-blue-400/10' },
-  food:       { icon: Wheat,       color: 'text-green-400',  bg: 'bg-green-400/10' },
-  minerals:   { icon: Gem,         color: 'text-amber-500',  bg: 'bg-amber-500/10' },
-  science:    { icon: FlaskConical,color: 'text-purple-400', bg: 'bg-purple-400/10' },
-  credits:    { icon: Coins,       color: 'text-emerald-400',bg: 'bg-emerald-400/10' },
-  population: { icon: Users,       color: 'text-cyan-400',   bg: 'bg-cyan-400/10' },
-  morale:     { icon: Smile,       color: 'text-orange-400', bg: 'bg-orange-400/10' },
-  oxygen:     { icon: Wind,        color: 'text-sky-300',    bg: 'bg-sky-300/10' },
+  energy:     { icon: Zap,          color: 'text-yellow-400' },
+  water:      { icon: Droplets,     color: 'text-blue-400' },
+  food:       { icon: Wheat,        color: 'text-green-400' },
+  minerals:   { icon: Gem,          color: 'text-amber-500' },
+  science:    { icon: FlaskConical, color: 'text-purple-400' },
+  credits:    { icon: Coins,        color: 'text-emerald-400' },
+  population: { icon: Users,        color: 'text-cyan-400' },
+  morale:     { icon: Smile,        color: 'text-orange-400' },
+  oxygen:     { icon: Wind,         color: 'text-sky-300' },
 };
 
 export default function ResourceBar() {
@@ -26,7 +26,6 @@ export default function ResourceBar() {
   const player = gameState.players[gameState.currentPlayerIndex];
   const gradeMode = gameState.settings?.gradeMode || 'standard';
   const activeResources = getActiveResources(gradeMode);
-
   const production = calculateResourceProduction(player, gameState.map);
   const maintenance = calculateMaintenance(player, gameState.map);
 
@@ -39,12 +38,9 @@ export default function ResourceBar() {
           if (!meta) return null;
           const Icon = meta.icon;
           const current = player.resources[key] || 0;
-          const prod = production[key] || 0;
-          const maint = maintenance[key] || 0;
-          const net = prod - maint;
+          const net = (production[key] || 0) - (maintenance[key] || 0);
           const isLow = current < 5 && key !== 'morale' && key !== 'population';
           const isCritical = current <= 0 && key !== 'morale' && key !== 'population';
-
           return (
             <div key={key} className={`flex items-center justify-between py-1 px-1.5 rounded ${isCritical ? 'bg-red-900/30 border border-red-700/50' : isLow ? 'bg-orange-900/20' : ''}`}>
               <div className="flex items-center gap-1.5 min-w-0">
@@ -52,14 +48,8 @@ export default function ResourceBar() {
                 <span className="text-gray-300 text-xs truncate">{t.resources[key]}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-xs font-mono font-bold ${isCritical ? 'text-red-400' : isLow ? 'text-orange-400' : 'text-white'}`}>
-                  {current}
-                </span>
-                {net !== 0 && (
-                  <span className={`text-[10px] font-mono ${net > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {net > 0 ? '+' : ''}{net}
-                  </span>
-                )}
+                <span className={`text-xs font-mono font-bold ${isCritical ? 'text-red-400' : isLow ? 'text-orange-400' : 'text-white'}`}>{current}</span>
+                {net !== 0 && <span className={`text-[10px] font-mono ${net > 0 ? 'text-green-400' : 'text-red-400'}`}>{net > 0 ? '+' : ''}{net}</span>}
               </div>
             </div>
           );

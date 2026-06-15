@@ -14,7 +14,6 @@ import VictoryScreen from '@/components/game/VictoryScreen';
 function GameRouter() {
   const { screen, gameState } = useGame();
 
-  // Check for game over
   if (gameState?.gameOver && screen === 'playing') {
     return (
       <div className="h-screen flex flex-col">
@@ -40,7 +39,6 @@ function GameRouter() {
     </>
   );
 
-  // In-game screens
   return (
     <div className="h-screen flex flex-col">
       <TopNav />

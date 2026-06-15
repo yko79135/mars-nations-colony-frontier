@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
-import { Globe, Map, FlaskConical, Handshake, Trophy, Rocket } from 'lucide-react';
+import { Globe, Map, FlaskConical, Users, Trophy, Rocket } from 'lucide-react';
 import { GRADE_MODES } from '@/lib/gameModes';
 
 export default function TopNav() {
@@ -12,7 +12,7 @@ export default function TopNav() {
     { key: 'playing', label: t.nav.game, icon: Rocket },
     { key: 'map', label: t.nav.map, icon: Map },
     { key: 'techTree', label: t.nav.technology, icon: FlaskConical },
-    { key: 'diplomacy', label: t.nav.diplomacy, icon: Handshake },
+    { key: 'diplomacy', label: t.nav.diplomacy, icon: Users },
     { key: 'rankings', label: t.nav.rankings, icon: Trophy },
   ];
 

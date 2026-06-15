@@ -52,17 +52,9 @@ export default function VictoryScreen() {
     { label: t.victory.largestTerritory, winner: [...players].sort((a, b) => (b.scores.territory || 0) - (a.scores.territory || 0))[0] },
   ];
 
-  const handleNewGame = () => {
-    updateGameState(null);
-    setScreen('menu');
-  };
-
+  const handleNewGame = () => { updateGameState(null); setScreen('menu'); };
   const handleContinue = () => {
-    updateGameState(prev => ({
-      ...prev,
-      gameOver: false,
-      settings: { ...prev.settings, gameLength: prev.settings.gameLength + 10 },
-    }));
+    updateGameState(prev => ({ ...prev, gameOver: false, settings: { ...prev.settings, gameLength: prev.settings.gameLength + 10 } }));
     setScreen('playing');
   };
 
@@ -79,32 +71,19 @@ export default function VictoryScreen() {
           </p>
         </div>
 
-        {/* Final rankings */}
         <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-5 mb-4">
           <h2 className="text-white font-heading font-bold mb-4">{t.victory.rankings}</h2>
           <div className="space-y-2">
             {sorted.map((player, rank) => {
               const total = Object.values(player.scores).reduce((s, v) => s + (v || 0), 0);
               return (
-                <div
-                  key={player.index}
-                  className={`flex items-center gap-3 p-3 rounded-lg ${
-                    rank === 0 ? 'bg-yellow-900/20 border border-yellow-700/40' :
-                    rank === 1 ? 'bg-gray-700/20 border border-gray-600/30' :
-                    rank === 2 ? 'bg-amber-900/10 border border-amber-800/20' : 'bg-gray-800/30'
-                  }`}
-                >
-                  <span className="text-xl w-8 text-center">
-                    {rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}.`}
-                  </span>
+                <div key={player.index} className={`flex items-center gap-3 p-3 rounded-lg ${rank === 0 ? 'bg-yellow-900/20 border border-yellow-700/40' : rank === 1 ? 'bg-gray-700/20 border border-gray-600/30' : rank === 2 ? 'bg-amber-900/10 border border-amber-800/20' : 'bg-gray-800/30'}`}>
+                  <span className="text-xl w-8 text-center">{rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}.`}</span>
                   <span className="text-2xl">{player.emblem}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-heading font-semibold text-sm" style={{ color: player.colorHex }}>
-                      {player.countryName}
-                    </p>
+                    <p className="font-heading font-semibold text-sm" style={{ color: player.colorHex }}>{player.countryName}</p>
                     <p className="text-gray-500 text-xs">{player.playerName}</p>
                   </div>
-                  {/* Score breakdown */}
                   <div className="hidden sm:flex gap-1 text-[10px] text-gray-500 font-mono">
                     {Object.entries(player.scores).map(([k, v]) => (
                       <span key={k} className="px-1 bg-gray-800/60 rounded" title={SCORE_LABELS_EN[k]}>{v || 0}</span>
@@ -117,7 +96,6 @@ export default function VictoryScreen() {
           </div>
         </div>
 
-        {/* Special awards */}
         <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-5 mb-4">
           <h2 className="text-white font-heading font-bold mb-3 flex items-center gap-2">
             <Medal size={16} className="text-orange-400" />
@@ -129,16 +107,13 @@ export default function VictoryScreen() {
                 <Star size={13} className="text-yellow-400 shrink-0" />
                 <div>
                   <p className="text-gray-400 text-xs">{award.label}</p>
-                  <p className="text-white text-sm font-medium">
-                    {award.winner?.emblem} {award.winner?.countryName}
-                  </p>
+                  <p className="text-white text-sm font-medium">{award.winner?.emblem} {award.winner?.countryName}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Reflection questions */}
         <div className="bg-gray-900/80 border border-gray-700 rounded-xl p-5 mb-6">
           <h2 className="text-white font-heading font-bold mb-3 flex items-center gap-2">
             <BookOpen size={16} className="text-blue-400" />
@@ -154,19 +129,12 @@ export default function VictoryScreen() {
           </ol>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-3 justify-center">
-          <button
-            onClick={handleNewGame}
-            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-heading font-semibold transition-colors flex items-center gap-2"
-          >
+          <button onClick={handleNewGame} className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-heading font-semibold transition-colors flex items-center gap-2">
             <Rocket size={16} />
             {t.victory.newGame}
           </button>
-          <button
-            onClick={handleContinue}
-            className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-heading font-semibold transition-colors"
-          >
+          <button onClick={handleContinue} className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-heading font-semibold transition-colors">
             {t.victory.continuePlay}
           </button>
         </div>

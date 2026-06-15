@@ -27,7 +27,6 @@ export default function TechTree() {
   const [selectedBranch, setSelectedBranch] = useState('survival');
   
   if (!gameState) return null;
-  
   const player = gameState.players[gameState.currentPlayerIndex];
 
   const getTechStatus = (techId) => {
@@ -43,7 +42,6 @@ export default function TechTree() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
-      {/* Header */}
       <div className="p-4 border-b border-gray-800 flex items-center gap-3">
         <button onClick={() => setScreen('playing')} className="text-gray-400 hover:text-white">
           <ChevronLeft size={20} />
@@ -57,79 +55,38 @@ export default function TechTree() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Branch tabs */}
         <div className="w-48 bg-gray-900/50 border-r border-gray-800 p-2 overflow-y-auto shrink-0">
           {BRANCHES.map(branch => (
-            <button
-              key={branch}
-              onClick={() => setSelectedBranch(branch)}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded text-left text-xs font-medium mb-1 transition-colors ${
-                selectedBranch === branch
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
-              }`}
-            >
+            <button key={branch} onClick={() => setSelectedBranch(branch)}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded text-left text-xs font-medium mb-1 transition-colors ${selectedBranch === branch ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
               <span>{BRANCH_ICONS[branch]}</span>
               <span>{t.tech[branch]}</span>
             </button>
           ))}
         </div>
 
-        {/* Tech list */}
         <div className="flex-1 p-4 overflow-y-auto">
           <div className="max-w-2xl mx-auto space-y-3">
             {branchTechs.map(([techId, techData]) => {
               const status = getTechStatus(techId);
-              
               return (
-                <div
-                  key={techId}
-                  className={`p-4 rounded-lg border ${BRANCH_COLORS[selectedBranch]} ${
-                    status === 'researched' ? 'opacity-60' : ''
-                  }`}
-                >
+                <div key={techId} className={`p-4 rounded-lg border ${BRANCH_COLORS[selectedBranch]} ${status === 'researched' ? 'opacity-60' : ''}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      {status === 'researched' ? (
-                        <Check size={16} className="text-green-400" />
-                      ) : status === 'available' ? (
-                        <Microscope size={16} className="text-yellow-400" />
-                      ) : (
-                        <Lock size={16} className="text-gray-500" />
-                      )}
-                      <h3 className="text-white font-heading font-semibold text-sm">
-                        {t.tech[techId] || techId}
-                      </h3>
+                      {status === 'researched' ? <Check size={16} className="text-green-400" /> : status === 'available' ? <Microscope size={16} className="text-yellow-400" /> : <Lock size={16} className="text-gray-500" />}
+                      <h3 className="text-white font-heading font-semibold text-sm">{t.tech[techId] || techId}</h3>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      status === 'researched' ? 'bg-green-900/30 text-green-400'
-                        : status === 'available' ? 'bg-yellow-900/30 text-yellow-400'
-                        : 'bg-gray-800 text-gray-500'
-                    }`}>
+                    <span className={`text-xs px-2 py-0.5 rounded ${status === 'researched' ? 'bg-green-900/30 text-green-400' : status === 'available' ? 'bg-yellow-900/30 text-yellow-400' : 'bg-gray-800 text-gray-500'}`}>
                       {t.tech[status]}
                     </span>
                   </div>
-
                   <div className="flex items-center gap-3 text-xs text-gray-400 mb-2">
                     <span>{t.actions.cost}: 🔬 {techData.cost.science}</span>
-                    {techData.prerequisites.length > 0 && (
-                      <span>
-                        Requires: {techData.prerequisites.map(p => t.tech[p] || p).join(', ')}
-                      </span>
-                    )}
+                    {techData.prerequisites.length > 0 && <span>Requires: {techData.prerequisites.map(p => t.tech[p] || p).join(', ')}</span>}
                   </div>
-
-                  {techData.unlocks.length > 0 && (
-                    <div className="text-xs text-gray-500">
-                      Unlocks: {techData.unlocks.map(u => t.buildings[u] || u).join(', ')}
-                    </div>
-                  )}
-
+                  {techData.unlocks.length > 0 && <div className="text-xs text-gray-500">Unlocks: {techData.unlocks.map(u => t.buildings[u] || u).join(', ')}</div>}
                   {status === 'available' && gameState.actionPoints > 0 && (
-                    <button
-                      onClick={() => researchTech(techId)}
-                      className="mt-2 px-4 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded text-xs font-medium transition-colors"
-                    >
+                    <button onClick={() => researchTech(techId)} className="mt-2 px-4 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded text-xs font-medium transition-colors">
                       {t.tech.researchBtn} (🔬 {techData.cost.science})
                     </button>
                   )}

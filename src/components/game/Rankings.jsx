@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
-import { ChevronLeft, Trophy, Medal } from 'lucide-react';
+import { ChevronLeft, Trophy } from 'lucide-react';
 
 export default function Rankings() {
   const { t } = useLang();
@@ -38,30 +38,19 @@ export default function Rankings() {
 
       <div className="flex-1 p-4 overflow-y-auto">
         <div className="max-w-4xl mx-auto">
-          {/* Overall ranking */}
           <div className="mb-8">
             <h3 className="text-gray-400 text-xs font-heading uppercase tracking-wider mb-3">{t.scoring.total}</h3>
             <div className="space-y-2">
               {playersTotalSorted.map((player, rank) => {
                 const total = Object.values(player.scores).reduce((sum, v) => sum + v, 0);
                 return (
-                  <div
-                    key={player.index}
-                    className="flex items-center gap-3 bg-gray-900/60 rounded-lg p-3 border border-gray-800"
-                  >
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                      rank === 0 ? 'bg-yellow-600/30 text-yellow-400' :
-                      rank === 1 ? 'bg-gray-500/30 text-gray-300' :
-                      rank === 2 ? 'bg-amber-700/30 text-amber-500' :
-                      'bg-gray-800 text-gray-500'
-                    }`}>
+                  <div key={player.index} className="flex items-center gap-3 bg-gray-900/60 rounded-lg p-3 border border-gray-800">
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${rank === 0 ? 'bg-yellow-600/30 text-yellow-400' : rank === 1 ? 'bg-gray-500/30 text-gray-300' : rank === 2 ? 'bg-amber-700/30 text-amber-500' : 'bg-gray-800 text-gray-500'}`}>
                       {rank + 1}
                     </span>
                     <span className="text-lg">{player.emblem}</span>
                     <div className="flex-1">
-                      <p className="text-white font-medium text-sm" style={{ color: player.colorHex }}>
-                        {player.countryName}
-                      </p>
+                      <p className="text-white font-medium text-sm" style={{ color: player.colorHex }}>{player.countryName}</p>
                       <p className="text-gray-500 text-xs">{player.playerName}</p>
                     </div>
                     <span className="text-white font-bold text-lg font-mono">{total}</span>
@@ -71,7 +60,6 @@ export default function Rankings() {
             </div>
           </div>
 
-          {/* Category scores */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {scoreCategories.map(cat => {
               const sorted = [...gameState.players].sort((a, b) => (b.scores[cat.key] || 0) - (a.scores[cat.key] || 0));

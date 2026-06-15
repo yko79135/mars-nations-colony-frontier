@@ -18,22 +18,13 @@ export default function GameScreen() {
 
   if (!gameState) return null;
 
-  const handleAction = (mode) => {
-    setActionMode(prev => prev === mode ? null : mode);
-  };
-
-  const handleHexSelect = (key) => {
-    setSelectedHex(key);
-  };
+  const handleAction = (mode) => setActionMode(prev => prev === mode ? null : mode);
 
   return (
     <div className="flex h-[calc(100vh-48px)] bg-gray-950 overflow-hidden">
-      {/* Left sidebar */}
       <LeftSidebar onAction={handleAction} actionMode={actionMode} />
 
-      {/* Main map area */}
       <div className="flex-1 relative">
-        {/* Action mode banner */}
         {actionMode && (
           <div className="absolute top-3 left-3 z-10 px-3 py-1.5 bg-gray-800/95 border border-orange-500/50 rounded-lg text-xs text-white flex items-center gap-2 shadow-lg">
             <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
@@ -44,27 +35,15 @@ export default function GameScreen() {
             <button onClick={() => setActionMode(null)} className="text-gray-400 hover:text-white ml-1">✕</button>
           </div>
         )}
-
-        {/* Save button */}
-        <button
-          onClick={() => setShowSave(true)}
-          className="absolute bottom-3 left-3 z-10 w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"
-        >
+        <button onClick={() => setShowSave(true)} className="absolute bottom-3 left-3 z-10 w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600">
           <Save size={16} />
         </button>
-
-        <HexMap onHexSelect={handleHexSelect} selectedHex={selectedHex} actionMode={actionMode} />
+        <HexMap onHexSelect={setSelectedHex} selectedHex={selectedHex} actionMode={actionMode} />
         <MapLegend />
       </div>
 
-      {/* Right info panel */}
       {selectedHex && (
-        <HexInfoPanel
-          hexKey={selectedHex}
-          onClose={() => setSelectedHex(null)}
-          actionMode={actionMode}
-          onClearAction={() => setActionMode(null)}
-        />
+        <HexInfoPanel hexKey={selectedHex} onClose={() => setSelectedHex(null)} actionMode={actionMode} onClearAction={() => setActionMode(null)} />
       )}
 
       <EventModal />
