@@ -2,17 +2,14 @@ import { createContext, useContext, useState } from 'react';
 
 const translations = {
   en: {
-    // Game title
     gameTitle: "Mars Nations: Colony Frontier",
     gameSubtitle: "Build your civilization on the Red Planet",
     
-    // Navigation
     nav: {
       game: "Game", map: "Map", technology: "Technology", diplomacy: "Diplomacy",
       rankings: "Rankings", rules: "Rules", settings: "Settings", language: "Language"
     },
     
-    // Setup
     setup: {
       title: "Game Setup",
       players: "Number of Players",
@@ -39,7 +36,6 @@ const translations = {
       nationCreation: "Nation Creation",
     },
     
-    // Nation creation
     nation: {
       countryName: "Country Name",
       abbreviation: "Abbreviation (3 letters)",
@@ -56,14 +52,12 @@ const translations = {
       required: "Required field",
     },
     
-    // Resources
     resources: {
       energy: "Energy", water: "Water", food: "Food", minerals: "Minerals",
       science: "Science", credits: "Credits", population: "Population",
       morale: "Morale", oxygen: "Oxygen"
     },
     
-    // Terrain
     terrain: {
       rockyPlain: "Rocky Plain", crater: "Crater", mountain: "Mountain",
       canyon: "Canyon", iceDeposit: "Ice Deposit", mineralDeposit: "Mineral Deposit",
@@ -71,7 +65,6 @@ const translations = {
       unexplored: "Unexplored", polarIce: "Polar Ice"
     },
     
-    // Buildings
     buildings: {
       landingHabitat: "Landing Habitat", advancedHabitat: "Advanced Habitat",
       solarFarm: "Solar Farm", nuclearReactor: "Nuclear Reactor",
@@ -83,7 +76,6 @@ const translations = {
       spaceport: "Spaceport", radiationShelter: "Radiation Shelter"
     },
     
-    // Actions
     actions: {
       explore: "Explore", claim: "Claim Territory", build: "Build",
       upgrade: "Upgrade", research: "Research", moveRover: "Move Rover",
@@ -94,7 +86,6 @@ const translations = {
       selectAction: "Select an action", cost: "Cost",
     },
     
-    // Turn phases
     phases: {
       resourceProduction: "Resource Production",
       eventResolution: "Event Resolution",
@@ -103,7 +94,6 @@ const translations = {
       endTurn: "End Turn"
     },
     
-    // Tech tree
     tech: {
       survival: "Survival", energy: "Energy", agriculture: "Agriculture",
       industry: "Industry", transportation: "Transportation",
@@ -144,7 +134,6 @@ const translations = {
       researchBtn: "Research",
     },
     
-    // Events
     events: {
       dustStorm: "Dust Storm",
       dustStormDesc: "A massive dust storm sweeps across the region, reducing solar energy production.",
@@ -179,7 +168,6 @@ const translations = {
       dismiss: "Dismiss",
     },
     
-    // Scoring
     scoring: {
       territory: "Territory", science: "Science", populationScore: "Population",
       livingConditions: "Living Conditions", economic: "Economic",
@@ -187,7 +175,6 @@ const translations = {
       achievement: "Achievement", total: "Total Score",
     },
     
-    // Victory
     victory: {
       scientific: "Scientific Victory",
       selfSufficiency: "Self-Sufficiency Victory",
@@ -210,7 +197,6 @@ const translations = {
       continuePlay: "Continue Playing",
     },
     
-    // Living conditions
     living: {
       housing: "Housing", foodSecurity: "Food Security", waterSecurity: "Water Security",
       oxygenSupply: "Oxygen Supply", health: "Health", safety: "Safety",
@@ -219,7 +205,6 @@ const translations = {
       score: "Living Conditions Score",
     },
     
-    // Diplomacy
     diplomacy: {
       proposeTrade: "Propose Trade", resourceAgreement: "Resource Agreement",
       formAlliance: "Form Alliance", nonAggression: "Non-Aggression Pact",
@@ -230,7 +215,6 @@ const translations = {
       pending: "Pending", active: "Active",
     },
     
-    // Save/Load
     save: {
       saveGame: "Save Game", loadGame: "Load Game", newGame: "New Game",
       exportSummary: "Export Summary", resetGame: "Reset Game",
@@ -240,7 +224,6 @@ const translations = {
       delete: "Delete", load: "Load", save: "Save",
     },
     
-    // General
     general: {
       round: "Round", turn: "Turn", player: "Player", of: "of",
       currentPlayer: "Current Player", capital: "Capital",
@@ -253,7 +236,6 @@ const translations = {
       selectHex: "Select a hex on the map",
     },
     
-    // Hex info panel
     hexPanel: {
       terrainType: "Terrain Type",
       resourceDeposits: "Resource Deposits",
@@ -264,7 +246,6 @@ const translations = {
       low: "Low", medium: "Medium", high: "High", extreme: "Extreme",
     },
     
-    // Educational
     edu: {
       learnMore: "Learn More",
       waterRecyclingInfo: "On Mars, every drop of water must be recycled. NASA's ISS already recycles about 90% of water, including from humidity and even urine. Mars colonies would need even higher efficiency since resupply from Earth takes 6-9 months.",
