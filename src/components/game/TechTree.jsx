@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
 import { TECH_TREE } from '@/lib/gameData';
-import { ChevronLeft, FlaskConical, Lock, Check, Microscope } from 'lucide-react';
+import { ChevronLeft, FlaskConical, Lock, Check, Search } from 'lucide-react';
 
 const BRANCHES = ['survival', 'energy', 'agriculture', 'industry', 'transportation', 'society', 'planetaryScience'];
 
@@ -73,7 +73,7 @@ export default function TechTree() {
                 <div key={techId} className={`p-4 rounded-lg border ${BRANCH_COLORS[selectedBranch]} ${status === 'researched' ? 'opacity-60' : ''}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      {status === 'researched' ? <Check size={16} className="text-green-400" /> : status === 'available' ? <Microscope size={16} className="text-yellow-400" /> : <Lock size={16} className="text-gray-500" />}
+                      {status === 'researched' ? <Check size={16} className="text-green-400" /> : status === 'available' ? <Search size={16} className="text-yellow-400" /> : <Lock size={16} className="text-gray-500" />}
                       <h3 className="text-white font-heading font-semibold text-sm">{t.tech[techId] || techId}</h3>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded ${status === 'researched' ? 'bg-green-900/30 text-green-400' : status === 'available' ? 'bg-yellow-900/30 text-yellow-400' : 'bg-gray-800 text-gray-500'}`}>
@@ -84,7 +84,7 @@ export default function TechTree() {
                     <span>{t.actions.cost}: 🔬 {techData.cost.science}</span>
                     {techData.prerequisites.length > 0 && <span>Requires: {techData.prerequisites.map(p => t.tech[p] || p).join(', ')}</span>}
                   </div>
-                  {techData.unlocks.length > 0 && <div className="text-xs text-gray-500">Unlocks: {techData.unlocks.map(u => t.buildings[u] || u).join(', ')}</div>}
+                  {techData.unlocks?.length > 0 && <div className="text-xs text-gray-500">Unlocks: {techData.unlocks.map(u => t.buildings[u] || u).join(', ')}</div>}
                   {status === 'available' && gameState.actionPoints > 0 && (
                     <button onClick={() => researchTech(techId)} className="mt-2 px-4 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded text-xs font-medium transition-colors">
                       {t.tech.researchBtn} (🔬 {techData.cost.science})

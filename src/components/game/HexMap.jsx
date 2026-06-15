@@ -15,9 +15,14 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
   const svgRef = useRef(null);
   const containerRef = useRef(null);
 
+  // Camera state lives here — stable, never reset by game-state changes.
+  // Only resetView() and fitToScreen() (called from the button) change it.
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 800, h: 600 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Track which map we have already fitted — fit only once per new map generation.
+  const fittedMapRef = useRef(null);
 
   const map = gameState?.map;
   const players = gameState?.players || [];
@@ -42,8 +47,9 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
     return valid;
   }, [map, gameState, actionMode]);
 
-  const resetView = useCallback(() => {
-    if (!map) return;
+  // Calculate the fit-to-screen viewBox from the current map extents
+  const computeFitViewBox = useCallback(() => {
+    if (!map) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     Object.values(map.hexes).forEach(hex => {
       const { x, y } = hexToPixel(hex.q, hex.r, HEX_SIZE);
@@ -51,11 +57,30 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
       maxX = Math.max(maxX, x + HEX_SIZE); maxY = Math.max(maxY, y + HEX_SIZE);
     });
     const padding = HEX_SIZE * 2;
-    setViewBox({ x: minX - padding, y: minY - padding, w: (maxX - minX) + padding * 2, h: (maxY - minY) + padding * 2 });
+    return { x: minX - padding, y: minY - padding, w: (maxX - minX) + padding * 2, h: (maxY - minY) + padding * 2 };
   }, [map]);
 
-  useEffect(() => { resetView(); }, [resetView]);
+  const fitToScreen = useCallback(() => {
+    const vb = computeFitViewBox();
+    if (vb) setViewBox(vb);
+  }, [computeFitViewBox]);
 
+  const resetView = useCallback(() => {
+    setViewBox({ x: 0, y: 0, w: 800, h: 600 });
+  }, []);
+
+  // Fit to screen ONLY when a brand-new map first appears — never again until a new game starts.
+  // We identify the map by the number of hexes + radius, which is stable within a game session.
+  useEffect(() => {
+    if (!map) return;
+    const mapId = `${map.radius}-${Object.keys(map.hexes).length}`;
+    if (fittedMapRef.current === mapId) return; // already fitted this map
+    fittedMapRef.current = mapId;
+    const vb = computeFitViewBox();
+    if (vb) setViewBox(vb);
+  }, [map, computeFitViewBox]); // computeFitViewBox is stable as long as map reference identity doesn't change
+
+  // Wheel zoom — passive: false so we can preventDefault
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -100,7 +125,7 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode }) {
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
         <button onClick={() => handleZoom(1)} className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><ZoomIn size={16} /></button>
         <button onClick={() => handleZoom(-1)} className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><ZoomOut size={16} /></button>
-        <button onClick={resetView} className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><Maximize size={16} /></button>
+        <button onClick={fitToScreen} title="Fit to screen" className="w-8 h-8 bg-gray-800/90 hover:bg-gray-700 rounded flex items-center justify-center text-gray-300 border border-gray-600"><Maximize size={16} /></button>
       </div>
 
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing select-none"
