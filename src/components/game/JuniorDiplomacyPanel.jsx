@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
 import { canPressurizeHex, getPressureCost } from '@/lib/gameData';
@@ -32,6 +32,23 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
   const { gameState, giveResource, pressurizeHex, resistPressure, surrenderPressure, proposeJuniorTrade, acceptProposal, rejectProposal } = useGame();
 
   const [flow, setFlow] = useState({ step: 'chooseAction', action: null, targetNationId: null, offerRes: {}, requestRes: {}, aidRes: 'minerals', aidAmt: '', pressureCost: null, resultMsg: null, reviewing: false });
+
+  // ── Highlight eligible hexes (must be before any early return for hook rules) ──
+  const eligibleHexes = useMemo(() => {
+    if (!gameState || flow.step !== 'selectHex' || flow.targetNationId === null) return [];
+    const pidx = gameState.currentPlayerIndex;
+    return Object.keys(gameState.map.hexes).filter(k => {
+      const hex = gameState.map.hexes[k];
+      return hex.owner === flow.targetNationId && canPressurizeHex(gameState, pidx, k);
+    });
+  }, [flow.step, flow.targetNationId, gameState]);
+
+  // ── React to selectedPressureHex prop ──
+  useEffect(() => {
+    if (flow.action === 'pressure' && selectedPressureHex && flow.step === 'selectHex') {
+      setFlow(prev => ({ ...prev, step: 'review' }));
+    }
+  }, [selectedPressureHex, flow.action, flow.step]);
 
   if (!gameState) return null;
   const pidx = gameState.currentPlayerIndex;
@@ -109,6 +126,7 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
       setStep('result', { resultMsg: lang === 'ko' ? '행동력이 부족합니다.' : 'Not enough Action Points.' });
       return;
     }
+    setStep('selectHex');
     onPressureHexSelect(true, flow.targetNationId);
   };
 
@@ -129,10 +147,6 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
         : `Pressure applied! (⭐${cost}, 1 AP used)`,
       pressureCost: null,
     });
-  };
-
-  const cancelPressure = () => {
-    onPressureHexSelect(false, null);
   };
 
   // ── Respond to Pressure ──
@@ -192,14 +206,114 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
     );
   }
 
-  // STEP: Select Hex (Pressure)
-  if (flow.step === 'selectHex') {
-    const cost = selectedPressureHex ? getPressureCost(gameState.map.hexes[selectedPressureHex], gameState) : null;
+  // STEP: Review (Pressure — hex selected, ready to confirm)
+  if (flow.step === 'review') {
+    const targetNation = gameState.players[flow.targetNationId];
     const selHex = selectedPressureHex ? gameState.map.hexes[selectedPressureHex] : null;
+    const cost = selHex ? getPressureCost(selHex, gameState) : 0;
+    if (!targetNation || !selHex) {
+      // fallback: go back to selectHex
+      return (
+        <div className="flex flex-col flex-1 items-center justify-center px-4 py-6 text-center">
+          <p className="text-gray-500 text-xs">{lang === 'ko' ? '타일이 선택되지 않았습니다.' : 'No hex selected.'}</p>
+          <button onClick={() => { setStep('selectHex'); onPressureHexSelect(true, flow.targetNationId); }}
+            className="mt-2 px-3 py-1.5 rounded-lg text-xs text-white"
+            style={{ background: 'rgba(255,255,255,0.08)' }}>
+            {lang === 'ko' ? '타일 선택으로' : 'Back to selection'}
+          </button>
+        </div>
+      );
+    }
+
+    const owner = gameState.players[selHex.owner];
+    const canAfford = stars >= cost && ap >= 1;
+
     return (
       <div className="flex flex-col flex-1">
         <div className="px-2 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <button onClick={backToNation} className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors">
+          <button onClick={() => { setStep('selectHex'); onPressureHexSelect(true, flow.targetNationId); }}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors">
+            <ArrowLeft size={10} />
+            <span>{lang === 'ko' ? '다른 타일 선택' : 'Choose Different Hex'}</span>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2">
+          {/* Target nation + hex overview */}
+          <div className="rounded-xl p-3" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
+            <div className="flex items-center gap-2 mb-2">
+              <span style={{ color: targetNation.colorHex }} className="text-base">{targetNation.emblem}</span>
+              <div>
+                <p className="text-white font-heading font-bold text-xs">{targetNation.countryName}</p>
+                <p className="text-[9px] text-gray-500">{lang === 'ko' ? '대상 국가' : 'Target nation'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{TERRAIN_ICONS[selHex.terrain] || '🪨'}</span>
+              <div>
+                <p className="text-white font-heading font-bold text-xs">{lang === 'ko' ? t.terrain[selHex.terrain] : t.terrain[selHex.terrain]}</p>
+                <p className="text-[9px] text-gray-500">{lang === 'ko' ? `소유: ${owner?.countryName || '—'}` : `Owner: ${owner?.countryName || '—'}`}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Buildings on hex */}
+          {(selHex.buildings || []).length > 0 && (
+            <div className="rounded-xl p-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <p className="text-[9px] text-yellow-400 font-bold mb-1">
+                🏗️ {(selHex.buildings || []).length} {lang === 'ko' ? '건물' : 'buildings'}
+              </p>
+              <p className="text-[9px] text-gray-400">
+                {selHex.buildings.map(b => t.buildings[b] || b).join(', ')}
+              </p>
+            </div>
+          )}
+
+          {/* Cost breakdown */}
+          <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="space-y-1.5 text-[10px]">
+              <div className="flex justify-between">
+                <span className="text-gray-400">{lang === 'ko' ? '영향력 비용' : 'Influence cost'}</span>
+                <span className="font-mono font-bold" style={{ color: stars >= cost ? '#fde68a' : '#f87171' }}>⭐{cost}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">{lang === 'ko' ? '내 영향력' : 'My influence'}</span>
+                <span className="font-mono text-yellow-400">⭐{stars} → ⭐{Math.max(0, stars - cost)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">{lang === 'ko' ? '행동력 비용' : 'AP cost'}</span>
+                <span className="font-mono text-white">{ap} → {ap - 1}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">{lang === 'ko' ? '대응 기한' : 'Response window'}</span>
+                <span className="text-gray-300">{lang === 'ko' ? '3턴' : '3 turns'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Confirm + Cancel */}
+          <button onClick={confirmPressure} disabled={!canAfford}
+            className="w-full py-2.5 rounded-xl text-sm font-heading font-bold transition-all disabled:opacity-30"
+            style={{ background: 'rgba(248,113,113,0.25)', border: '1px solid rgba(248,113,113,0.4)', color: '#fca5a5' }}>
+            {lang === 'ko' ? `압박 확인 (⭐${cost}, 1 AP)` : `Confirm Pressure (⭐${cost}, 1 AP)`}
+          </button>
+
+          <button onClick={() => { onPressureHexSelect(false, null); setStep('configureAction'); }}
+            className="w-full py-2 rounded-xl text-xs font-heading font-bold transition-all"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#9ca3af' }}>
+            {lang === 'ko' ? '취소' : 'Cancel'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // STEP: Select Hex (Pressure — waiting for user to click a hex on the map)
+  if (flow.step === 'selectHex') {
+    return (
+      <div className="flex flex-col flex-1">
+        <div className="px-2 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <button onClick={() => { onPressureHexSelect(false, null); setStep('configureAction'); }}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors">
             <ArrowLeft size={10} />
             <span>{lang === 'ko' ? '국가 선택으로' : 'Back to nation'}</span>
           </button>
@@ -215,36 +329,6 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
                 : 'Click a highlighted border hex on the map. Cost: 2 base + 1 per building.'}
             </p>
           </div>
-
-          {selectedPressureHex && selHex && (
-            <div className="rounded-xl p-3 mb-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">{TERRAIN_ICONS[selHex.terrain] || '🪨'}</span>
-                <div>
-                  <p className="text-white font-heading font-bold text-xs">{lang === 'ko' ? t.terrain[selHex.terrain] : t.terrain[selHex.terrain]}</p>
-                  <p className="text-[9px] text-gray-500">{lang === 'ko' ? `소유: ${gameState.players[selHex.owner]?.countryName}` : `Owner: ${gameState.players[selHex.owner]?.countryName}`}</p>
-                </div>
-              </div>
-              {(selHex.buildings || []).length > 0 && (
-                <p className="text-[9px] text-yellow-400 mb-2">
-                  🏗️ {(selHex.buildings || []).length} {lang === 'ko' ? '건물' : 'buildings'} ({selHex.buildings.map(b => t.buildings[b] || b).join(', ')})
-                </p>
-              )}
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-400">{lang === 'ko' ? '총 비용' : 'Total cost'}</span>
-                <span className="font-mono font-bold" style={{ color: stars >= cost ? '#fde68a' : '#f87171' }}>⭐{cost}</span>
-              </div>
-              <button onClick={confirmPressure} disabled={stars < cost || ap <= 0}
-                className="w-full mt-2 py-2 rounded-xl text-xs font-heading font-bold transition-all disabled:opacity-30"
-                style={{ background: 'rgba(248,113,113,0.25)', border: '1px solid rgba(248,113,113,0.4)', color: '#fca5a5' }}>
-                {lang === 'ko' ? `압박 확인 (⭐${cost}, 1 AP)` : `Confirm Pressure (⭐${cost}, 1 AP)`}
-              </button>
-              <button onClick={cancelPressure}
-                className="w-full mt-1 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white transition-all">
-                {lang === 'ko' ? '취소' : 'Cancel'}
-              </button>
-            </div>
-          )}
 
           {eligibleHexes.length === 0 && (
             <p className="text-gray-600 text-xs text-center py-4">
