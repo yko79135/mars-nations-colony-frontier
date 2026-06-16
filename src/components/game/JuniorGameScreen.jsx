@@ -193,6 +193,12 @@ export default function JuniorGameScreen() {
         </div>
         {/* Resource strip */}
         <div className="ml-auto flex items-center gap-3">
+          {/* Influence stars */}
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded"
+            style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)' }}>
+            <span className="text-yellow-400 text-xs">⭐</span>
+            <span className="font-mono font-bold text-xs text-yellow-400">{player.influenceStars || 0}</span>
+          </div>
           {RESOURCE_META.map(m => {
             const val = player.resources[m.key] || 0;
             const low = val <= 3;
@@ -262,100 +268,118 @@ export default function JuniorGameScreen() {
           <JuniorMapLegend />
         </div>
 
-        {/* Right panel: actions + scores */}
-        <div className="w-48 flex flex-col shrink-0 overflow-y-auto"
+        {/* Right panel: actions + scores OR dispute */}
+        <div className="w-64 flex flex-col shrink-0 overflow-y-auto"
           style={{ background: 'rgba(8,12,25,0.97)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
 
-          {/* Building guide shortcut */}
-          <button onClick={() => setShowBuildGuide(true)}
-            className="flex items-center gap-2 px-3 py-2.5 text-xs text-gray-500 hover:text-gray-200 transition-colors"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <BookOpen size={12} />
-            <span>{lang === 'ko' ? '건물 안내' : 'Building Guide'}</span>
-          </button>
-
-          {/* Action buttons */}
-          <div className="p-2 space-y-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="text-[9px] text-gray-600 uppercase tracking-widest px-1 mb-1">
-              {lang === 'ko' ? '행동 선택' : 'Actions'}
-            </div>
-            {ACTIONS.map(action => {
-              const isActive = actionMode === action.key;
-              const disabled = ap <= 0 && action.ap > 0;
-              const ACTION_COLORS = {
-                explore: { active: 'rgba(96,165,250,0.2)', border: 'rgba(96,165,250,0.5)', text: '#93c5fd' },
-                claim:   { active: 'rgba(74,222,128,0.2)', border: 'rgba(74,222,128,0.5)', text: '#86efac' },
-                build:   { active: 'rgba(251,191,36,0.2)', border: 'rgba(251,191,36,0.5)', text: '#fde68a' },
-                research:{ active: 'rgba(167,139,250,0.2)', border: 'rgba(167,139,250,0.5)', text: '#c4b5fd' },
-                help:    { active: 'rgba(251,146,60,0.2)', border: 'rgba(251,146,60,0.5)', text: '#fed7aa' },
-              };
-              const ac = ACTION_COLORS[action.key];
-              return (
-                <button key={action.key} onClick={() => handleAction(action.key)} disabled={disabled}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all"
-                  style={{
-                    background: isActive ? ac.active : disabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${isActive ? ac.border : disabled ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.07)'}`,
-                    color: isActive ? ac.text : disabled ? 'rgba(107,114,128,1)' : 'rgba(209,213,219,1)',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    opacity: disabled ? 0.5 : 1,
-                  }}>
-                  <span className="text-base">{action.emoji}</span>
-                  <span className="flex-1 text-xs font-medium">{action.label}</span>
-                  {action.ap > 0 && <span className="text-[9px] opacity-60">{action.ap}AP</span>}
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: ac.text }} />}
+          {showDispute ? (
+            <>
+              <div className="flex items-center gap-2 px-3 py-2.5 shrink-0"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <button onClick={() => setShowDispute(false)}
+                  className="text-gray-500 hover:text-white transition-colors p-0.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
                 </button>
-              );
-            })}
-
-            <button onClick={endTurn}
-              className="w-full py-2.5 text-white rounded-xl font-heading font-bold text-sm transition-all mt-2 flex items-center justify-center gap-1.5"
-              style={{
-                background: 'linear-gradient(135deg, #ea580c, #c2410c)',
-                border: '1px solid rgba(251,146,60,0.4)',
-                boxShadow: '0 4px 12px rgba(234,88,12,0.3)',
-              }}>
-              <SkipForward size={13} />
-              {t.actions.endTurn}
-            </button>
-          </div>
-
-          {/* Resource list */}
-          <div className="px-3 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="text-[9px] text-gray-600 uppercase tracking-widest mb-1.5">
-              {lang === 'ko' ? '자원' : 'Resources'}
-            </div>
-            <div className="space-y-1">
-              {RESOURCE_META.map(m => {
-                const val = player.resources[m.key] || 0;
-                const low = val <= 3;
-                return (
-                  <div key={m.key} className="flex items-center gap-1.5 py-0.5 px-1.5 rounded"
-                    style={{ background: low ? 'rgba(239,68,68,0.08)' : 'transparent' }}>
-                    <span className="text-xs">{m.icon}</span>
-                    <span className="text-[10px] text-gray-500 flex-1">{m.label}</span>
-                    <span className="font-mono text-xs font-bold" style={{ color: low ? '#f87171' : m.color }}>{val}</span>
-                    {low && <span className="text-[8px] text-red-400">!</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Score leaderboard */}
-          <div className="mt-auto px-3 py-2">
-            <div className="text-[9px] text-gray-600 uppercase tracking-widest mb-1.5">
-              {lang === 'ko' ? '점수 순위' : 'Standings'}
-            </div>
-            {scores.map((p, rank) => (
-              <div key={p.index} className="flex items-center gap-1.5 py-0.5">
-                <span className="text-xs">{rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}`}</span>
-                <span className="text-xs font-medium" style={{ color: p.colorHex }}>{p.emblem}</span>
-                <span className="text-[10px] text-gray-400 flex-1 truncate">{p.abbreviation}</span>
-                <span className="text-xs font-mono font-bold text-white">{p.total}</span>
+                <h3 className="text-white font-heading font-bold text-xs">
+                  {lang === 'ko' ? '분쟁 해결' : 'Resolve Dispute'}
+                </h3>
               </div>
-            ))}
-          </div>
+              <JuniorDisputePanel onClose={() => setShowDispute(false)} />
+            </>
+          ) : (
+            <>
+              {/* Building guide shortcut */}
+              <button onClick={() => setShowBuildGuide(true)}
+                className="flex items-center gap-2 px-3 py-2.5 text-xs text-gray-500 hover:text-gray-200 transition-colors"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <BookOpen size={12} />
+                <span>{lang === 'ko' ? '건물 안내' : 'Building Guide'}</span>
+              </button>
+
+              {/* Action buttons */}
+              <div className="p-2 space-y-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="text-[9px] text-gray-600 uppercase tracking-widest px-1 mb-1">
+                  {lang === 'ko' ? '행동 선택' : 'Actions'}
+                </div>
+                {ACTIONS.map(action => {
+                  const isActive = actionMode === action.key;
+                  const disabled = ap <= 0 && action.ap > 0;
+                  const ACTION_COLORS = {
+                    explore: { active: 'rgba(96,165,250,0.2)', border: 'rgba(96,165,250,0.5)', text: '#93c5fd' },
+                    claim:   { active: 'rgba(74,222,128,0.2)', border: 'rgba(74,222,128,0.5)', text: '#86efac' },
+                    build:   { active: 'rgba(251,191,36,0.2)', border: 'rgba(251,191,36,0.5)', text: '#fde68a' },
+                    research:{ active: 'rgba(167,139,250,0.2)', border: 'rgba(167,139,250,0.5)', text: '#c4b5fd' },
+                    help:    { active: 'rgba(251,146,60,0.2)', border: 'rgba(251,146,60,0.5)', text: '#fed7aa' },
+                  };
+                  const ac = ACTION_COLORS[action.key];
+                  return (
+                    <button key={action.key} onClick={() => handleAction(action.key)} disabled={disabled}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all"
+                      style={{
+                        background: isActive ? ac.active : disabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${isActive ? ac.border : disabled ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.07)'}`,
+                        color: isActive ? ac.text : disabled ? 'rgba(107,114,128,1)' : 'rgba(209,213,219,1)',
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                        opacity: disabled ? 0.5 : 1,
+                      }}>
+                      <span className="text-base">{action.emoji}</span>
+                      <span className="flex-1 text-xs font-medium">{action.label}</span>
+                      {action.ap > 0 && <span className="text-[9px] opacity-60">{action.ap}AP</span>}
+                      {isActive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: ac.text }} />}
+                    </button>
+                  );
+                })}
+
+                <button onClick={endTurn}
+                  className="w-full py-2.5 text-white rounded-xl font-heading font-bold text-sm transition-all mt-2 flex items-center justify-center gap-1.5"
+                  style={{
+                    background: 'linear-gradient(135deg, #ea580c, #c2410c)',
+                    border: '1px solid rgba(251,146,60,0.4)',
+                    boxShadow: '0 4px 12px rgba(234,88,12,0.3)',
+                  }}>
+                  <SkipForward size={13} />
+                  {t.actions.endTurn}
+                </button>
+              </div>
+
+              {/* Resource list */}
+              <div className="px-3 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="text-[9px] text-gray-600 uppercase tracking-widest mb-1.5">
+                  {lang === 'ko' ? '자원' : 'Resources'}
+                </div>
+                <div className="space-y-1">
+                  {RESOURCE_META.map(m => {
+                    const val = player.resources[m.key] || 0;
+                    const low = val <= 3;
+                    return (
+                      <div key={m.key} className="flex items-center gap-1.5 py-0.5 px-1.5 rounded"
+                        style={{ background: low ? 'rgba(239,68,68,0.08)' : 'transparent' }}>
+                        <span className="text-xs">{m.icon}</span>
+                        <span className="text-[10px] text-gray-500 flex-1">{m.label}</span>
+                        <span className="font-mono text-xs font-bold" style={{ color: low ? '#f87171' : m.color }}>{val}</span>
+                        {low && <span className="text-[8px] text-red-400">!</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Score leaderboard */}
+              <div className="mt-auto px-3 py-2">
+                <div className="text-[9px] text-gray-600 uppercase tracking-widest mb-1.5">
+                  {lang === 'ko' ? '점수 순위' : 'Standings'}
+                </div>
+                {scores.map((p, rank) => (
+                  <div key={p.index} className="flex items-center gap-1.5 py-0.5">
+                    <span className="text-xs">{rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `${rank + 1}`}</span>
+                    <span className="text-xs font-medium" style={{ color: p.colorHex }}>{p.emblem}</span>
+                    <span className="text-[10px] text-gray-400 flex-1 truncate">{p.abbreviation}</span>
+                    <span className="text-xs font-mono font-bold text-white">{p.total}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -374,7 +398,6 @@ export default function JuniorGameScreen() {
 
       {showResearch && <ResearchPanel onClose={() => setShowResearch(false)} />}
       {showCoop && <CooperationPanel onClose={() => setShowCoop(false)} />}
-      {showDispute && <JuniorDisputePanel onClose={() => setShowDispute(false)} />}
       <EventModal />
       <SaveLoadModal isOpen={showSave} onClose={() => setShowSave(false)} />
     </div>

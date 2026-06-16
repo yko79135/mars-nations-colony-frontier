@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel, isExploredByNation, canExploreHex, canClaimHex, DIPLOMACY_RESOURCES, getTrust, adjustTrust, isHexEligibleForTransfer, wouldTransferDisconnectCapital, isBorderHex, calculateSecurityCapacity, calculateConflictStrength, DIPLOMATIC_INFLUENCE, JUNIOR_INFLUENCE } from './gameData';
+import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel, isExploredByNation, canExploreHex, canClaimHex, DIPLOMACY_RESOURCES, getTrust, adjustTrust, isHexEligibleForTransfer, wouldTransferDisconnectCapital, isBorderHex, calculateSecurityCapacity, calculateConflictStrength, DIPLOMATIC_INFLUENCE, JUNIOR_INFLUENCE, calculateInfluenceAccrual } from './gameData';
 import { JUNIOR_TECHS } from './gameModes';
 
 const GameContext = createContext();
@@ -591,6 +591,98 @@ export function GameProvider({ children }) {
     });
   }, []);
 
+  // ---- PRESSURE / INFLUENCE SYSTEM ----
+
+  const pressurizeHex = useCallback((hexKey) => {
+    setGameState(prev => {
+      if (!prev || prev.actionPoints <= 0) return prev;
+      const pidx = prev.currentPlayerIndex;
+      const player = prev.players[pidx];
+      const hex = prev.map.hexes[hexKey];
+      if (!hex || hex.owner === pidx || hex.isCapital || hex.owner === null || hex.owner === undefined) return prev;
+
+      const isJunior = prev.settings?.gradeMode === 'junior';
+      const config = isJunior
+        ? { baseCost: 2, costPerBuilding: 1, turnsToRespond: 3, maxActivePerNation: 1 }
+        : { baseCost: 15, costPerBuilding: 5, turnsToRespond: 3, maxActivePerNation: 2 };
+
+      const cost = config.baseCost + (hex.buildings || []).length * config.costPerBuilding;
+      const influenceKey = isJunior ? 'influenceStars' : 'diplomaticInfluence';
+      if ((player[influenceKey] || 0) < cost) return prev;
+
+      const activeCount = (prev.pendingPressures || []).filter(p =>
+        p.attackerIdx === pidx && p.status === 'active'
+      ).length;
+      if (activeCount >= config.maxActivePerNation) return prev;
+
+      const next = JSON.parse(JSON.stringify(prev));
+      next.players[pidx][influenceKey] -= cost;
+      if (!next.pendingPressures) next.pendingPressures = [];
+      next.pendingPressures.push({
+        id: `press_${Date.now()}`,
+        attackerIdx: pidx,
+        defenderIdx: hex.owner,
+        hexKey,
+        cost,
+        turnsToRespond: config.turnsToRespond,
+        defenderTurnsRemaining: config.turnsToRespond,
+        status: 'active',
+        createdRound: next.currentRound,
+      });
+      next.actionPoints -= 1;
+      return next;
+    });
+  }, []);
+
+  const resistPressure = useCallback((pressureId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const idx = (next.pendingPressures || []).findIndex(p => p.id === pressureId);
+      if (idx === -1) return prev;
+      const p = next.pendingPressures[idx];
+      if (p.status !== 'active' || p.defenderIdx !== next.currentPlayerIndex) return prev;
+
+      const isJunior = next.settings?.gradeMode === 'junior';
+      const influenceKey = isJunior ? 'influenceStars' : 'diplomaticInfluence';
+      const player = next.players[next.currentPlayerIndex];
+      if ((player[influenceKey] || 0) < p.cost) return prev;
+
+      player[influenceKey] -= p.cost;
+      next.pendingPressures[idx].status = 'resisted';
+      next.pendingPressures[idx].resolvedRound = next.currentRound;
+      return next;
+    });
+  }, []);
+
+  const surrenderPressure = useCallback((pressureId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const idx = (next.pendingPressures || []).findIndex(p => p.id === pressureId);
+      if (idx === -1) return prev;
+      const p = next.pendingPressures[idx];
+      if (p.status !== 'active' || p.defenderIdx !== next.currentPlayerIndex) return prev;
+      if (!next.map.hexes[p.hexKey]) return prev;
+
+      next.map.hexes[p.hexKey].owner = p.attackerIdx;
+      if (!next.map.hexes[p.hexKey].exploredBy) next.map.hexes[p.hexKey].exploredBy = {};
+      next.map.hexes[p.hexKey].exploredBy[p.attackerIdx] = true;
+      next.pendingPressures[idx].status = 'surrendered';
+      next.pendingPressures[idx].resolvedRound = next.currentRound;
+
+      if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+      next.diplomacy.history.push({
+        type: 'hexSurrendered',
+        hexKey: p.hexKey,
+        fromNationIndex: p.defenderIdx,
+        toNationIndex: p.attackerIdx,
+        round: next.currentRound,
+      });
+      return next;
+    });
+  }, []);
+
   // ---- DISPUTE MANAGEMENT ----
 
   const createDispute = useCallback((hexKey, nationA, nationB, reason) => {
@@ -747,6 +839,15 @@ export function GameProvider({ children }) {
           Object.entries(prod).forEach(([res, amt]) => {
             if (amt > 0) p.resources[res] = (p.resources[res] || 0) + amt;
           });
+
+          // Influence accrual
+          const gained = calculateInfluenceAccrual(p, next, next.map);
+          if (isJunior) {
+            p.influenceStars = Math.min(JUNIOR_INFLUENCE.max, (p.influenceStars || 0) + gained);
+          } else if (p.diplomaticInfluence !== undefined) {
+            p.diplomaticInfluence = Math.min(DIPLOMATIC_INFLUENCE.max, p.diplomaticInfluence + gained);
+          }
+
           if (!isJunior) {
             p.scores = calculateScores(p, next.map);
           } else {
@@ -789,6 +890,24 @@ export function GameProvider({ children }) {
               });
             });
           }
+        }
+
+        // Pressure tick-down: decrement defender turns, auto-transfer at 0
+        if (next.pendingPressures) {
+          next.pendingPressures.forEach(p => {
+            if (p.status !== 'active') return;
+            p.defenderTurnsRemaining -= 1;
+            if (p.defenderTurnsRemaining <= 0) {
+              p.status = 'autoTransferred';
+              if (next.map.hexes[p.hexKey]) {
+                next.map.hexes[p.hexKey].owner = p.attackerIdx;
+                if (!next.map.hexes[p.hexKey].exploredBy) next.map.hexes[p.hexKey].exploredBy = {};
+                next.map.hexes[p.hexKey].exploredBy[p.attackerIdx] = true;
+              }
+              if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+              next.diplomacy.history.push({ type: 'hexPressureWon', hexKey: p.hexKey, fromNationIndex: p.defenderIdx, toNationIndex: p.attackerIdx, round: next.currentRound });
+            }
+          });
         }
 
         // Cooldown decay: reduce all cooldowns by 1 each round
@@ -877,6 +996,7 @@ export function GameProvider({ children }) {
       proposeAgreement, acceptProposal, rejectProposal, withdrawProposal, cancelAgreement,
       transferHex, adjustDiplomaticInfluence, adjustJuniorInfluenceStars, juniorLandExchange, createDispute, resolveDispute,
       requestMarsCouncil, castCouncilVote, getCooldown, proposeTerritorialRequest,
+      pressurizeHex, resistPressure, surrenderPressure,
       endTurn, dismissEvent,
       saveGame, loadGame, getSavedGames, deleteSave,
       // Camera API — stable, never touched by game actions

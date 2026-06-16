@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
 import { canPressurizeHex, getPressureCost, getHexNeighbors } from '@/lib/gameData';
-import { ChevronLeft, Handshake, MapPin, Star, Gavel, Zap } from 'lucide-react';
+import { Handshake, MapPin, Star, Gavel, Zap } from 'lucide-react';
 
 const RES_ICONS = { energy: '⚡', water: '💧', food: '🌾', minerals: '💎', science: '🔬' };
 const TERRAIN_ICONS = {
@@ -79,31 +79,24 @@ export default function JuniorDisputePanel({ onClose }) {
   ];
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col" style={{ background: 'rgba(4,8,15,0.98)' }}>
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 shrink-0"
-        style={{ background: 'rgba(8,12,25,1)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-        <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-          <ChevronLeft size={18} />
-        </button>
-        <h2 className="text-white font-heading font-bold text-base">
-          {lang === 'ko' ? '분쟁 해결' : 'Resolve Dispute'}
-        </h2>
-        <div className="ml-auto flex items-center gap-1 text-yellow-400 text-xs">
-          <Star size={12} />
-          <span>{stars}</span>
-        </div>
+    <div className="flex flex-col flex-1">
+      {/* Stars indicator */}
+      <div className="flex items-center gap-2 px-3 py-2"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <span className="text-[9px] text-gray-500">{lang === 'ko' ? '영향력' : 'Influence'}</span>
+        <span className="text-yellow-400 text-xs">⭐</span>
+        <span className="text-yellow-400 font-mono font-bold text-xs">{stars}</span>
       </div>
 
       {/* Target selection */}
-      <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-        <p className="text-[9px] text-gray-600 uppercase tracking-widest mb-2">{t.cooperation.selectNation}</p>
-        <div className="flex gap-2 flex-wrap">
+      <div className="px-2 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <p className="text-[8px] text-gray-600 uppercase tracking-widest mb-1.5">{t.cooperation.selectNation}</p>
+        <div className="flex gap-1.5 flex-wrap">
           {otherPlayers.map(p => {
             const isSelected = targetPlayer === p.index;
             return (
               <button key={p.index} onClick={() => setTargetPlayer(isSelected ? null : p.index)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] transition-all"
                 style={{
                   background: isSelected ? p.colorHex + '20' : 'rgba(255,255,255,0.04)',
                   border: `1px solid ${isSelected ? p.colorHex + '50' : 'rgba(255,255,255,0.07)'}`,
@@ -118,13 +111,13 @@ export default function JuniorDisputePanel({ onClose }) {
       </div>
 
       {flash && (
-        <div className="mx-4 mt-3 px-3 py-2 rounded-lg text-xs text-center animate-pulse"
+        <div className="mx-2 mt-2 px-2 py-1.5 rounded-lg text-[10px] text-center animate-pulse"
           style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', color: '#fde68a' }}>
           {flash}
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2">
         {/* Action tabs */}
         <div className="flex gap-1.5 flex-wrap">
           {ACTIONS.map(a => {
