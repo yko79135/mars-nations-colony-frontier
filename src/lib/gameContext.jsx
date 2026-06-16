@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel, isExploredByNation, canExploreHex, canClaimHex, DIPLOMACY_RESOURCES, getTrust, adjustTrust } from './gameData';
+import { createInitialGameState, calculateResourceProduction, calculateMaintenance, calculateScores, EVENTS, JUNIOR_EVENTS, BUILDINGS, TECH_TREE, getHexNeighbors, getPlayerLabLevel, isExploredByNation, canExploreHex, canClaimHex, DIPLOMACY_RESOURCES, getTrust, adjustTrust, isHexEligibleForTransfer, wouldTransferDisconnectCapital, isBorderHex, calculateSecurityCapacity, calculateConflictStrength, DIPLOMATIC_INFLUENCE, JUNIOR_INFLUENCE } from './gameData';
 import { JUNIOR_TECHS } from './gameModes';
 
 const GameContext = createContext();
@@ -370,6 +370,60 @@ export function GameProvider({ children }) {
         proposer.scores.cooperation = (proposer.scores.cooperation || 0) + 5;
       }
 
+      // Territorial request with hex transfer
+      if (proposal.type === 'territorialRequest') {
+        // Process offered resources
+        const offeredRes = proposal.offeredResources || {};
+        const requestedRes = proposal.requestedResources || {};
+        for (const [res, amt] of Object.entries(offeredRes)) {
+          if ((proposer.resources[res] || 0) < amt) return prev;
+          proposer.resources[res] -= amt;
+          recipient.resources[res] = (recipient.resources[res] || 0) + amt;
+        }
+        for (const [res, amt] of Object.entries(requestedRes)) {
+          if ((recipient.resources[res] || 0) < amt) return prev;
+          recipient.resources[res] -= amt;
+          proposer.resources[res] = (proposer.resources[res] || 0) + amt;
+        }
+
+        // Process hex transfers
+        (proposal.offeredHexes || []).forEach(hk => {
+          if (next.map.hexes[hk] && next.map.hexes[hk].owner === proposal.proposerIndex) {
+            next.map.hexes[hk].owner = pidx;
+            if (!next.map.hexes[hk].exploredBy) next.map.hexes[hk].exploredBy = {};
+            next.map.hexes[hk].exploredBy[pidx] = true;
+            if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+            next.diplomacy.history.push({
+              type: 'hexTransfer', hexKey: hk, fromNationIndex: proposal.proposerIndex, toNationIndex: pidx,
+              round: next.currentRound, timestamp: Date.now(),
+            });
+          }
+        });
+        (proposal.requestedHexes || []).forEach(hk => {
+          if (next.map.hexes[hk] && next.map.hexes[hk].owner === pidx) {
+            next.map.hexes[hk].owner = proposal.proposerIndex;
+            if (!next.map.hexes[hk].exploredBy) next.map.hexes[hk].exploredBy = {};
+            next.map.hexes[hk].exploredBy[proposal.proposerIndex] = true;
+            if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+            next.diplomacy.history.push({
+              type: 'hexTransfer', hexKey: hk, fromNationIndex: pidx, toNationIndex: proposal.proposerIndex,
+              round: next.currentRound, timestamp: Date.now(),
+            });
+          }
+        });
+
+        // Adjust diplomatic influence
+        if (proposer.diplomaticInfluence !== undefined) {
+          proposer.diplomaticInfluence = Math.max(0, Math.min(100, proposer.diplomaticInfluence + DIPLOMATIC_INFLUENCE.gains.completeFairTrade));
+        }
+        if (recipient.diplomaticInfluence !== undefined) {
+          recipient.diplomaticInfluence = Math.max(0, Math.min(100, recipient.diplomaticInfluence + DIPLOMATIC_INFLUENCE.gains.completeFairTrade));
+        }
+        adjustTrust(next, proposal.proposerIndex, pidx, 5);
+        proposer.scores.cooperation = (proposer.scores.cooperation || 0) + 8;
+        recipient.scores.cooperation = (recipient.scores.cooperation || 0) + 8;
+      }
+
       // Emergency aid
       if (proposal.type === 'emergencyAid') {
         const resource = proposal.aidResource;
@@ -436,6 +490,227 @@ export function GameProvider({ children }) {
       next.players[agr.nationIds[0]].scores.cooperation = Math.max(0, (next.players[agr.nationIds[0]].scores.cooperation || 0) - 5);
       next.players[agr.nationIds[1]].scores.cooperation = Math.max(0, (next.players[agr.nationIds[1]].scores.cooperation || 0) - 5);
       next.diplomacy.history.push({ ...agr, cancelledRound: next.currentRound, cancelledBy: next.currentPlayerIndex });
+      return next;
+    });
+  }, []);
+
+  // ---- JUNIOR LAND EXCHANGE (hex + resource payment) ----
+
+  const juniorLandExchange = useCallback((hexKey, toNationIndex, resource, amount) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const hex = prev.map.hexes[hexKey];
+      if (!hex || hex.owner !== prev.currentPlayerIndex) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const pidx = next.currentPlayerIndex;
+      const fromPlayer = next.players[toNationIndex]; // paying nation
+      const toPlayer = next.players[pidx]; // receiving nation
+
+      if ((fromPlayer.resources[resource] || 0) < amount) return prev;
+
+      // Transfer hex
+      next.map.hexes[hexKey].owner = toNationIndex;
+      if (!next.map.hexes[hexKey].exploredBy) next.map.hexes[hexKey].exploredBy = {};
+      next.map.hexes[hexKey].exploredBy[toNationIndex] = true;
+
+      // Transfer resources
+      fromPlayer.resources[resource] -= amount;
+      toPlayer.resources[resource] = (toPlayer.resources[resource] || 0) + amount;
+
+      // Record history
+      if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+      next.diplomacy.history.push({
+        type: 'juniorLandExchange', hexKey, fromNationIndex: pidx, toNationIndex,
+        resource, amount, round: next.currentRound,
+      });
+
+      adjustTrust(next, pidx, toNationIndex, 4);
+      return next;
+    });
+  }, []);
+
+  // ---- HEX TRANSFER ----
+
+  const transferHex = useCallback((hexKey, toNationIndex) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const hex = prev.map.hexes[hexKey];
+      if (!hex) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const fromNationIndex = next.map.hexes[hexKey].owner;
+      if (fromNationIndex === null || fromNationIndex === undefined) return prev;
+
+      // Transfer ownership
+      next.map.hexes[hexKey].owner = toNationIndex;
+
+      // Mark as explored by receiving nation
+      if (!next.map.hexes[hexKey].exploredBy) next.map.hexes[hexKey].exploredBy = {};
+      next.map.hexes[hexKey].exploredBy[toNationIndex] = true;
+
+      // Record in diplomacy history
+      if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+      next.diplomacy.history.push({
+        type: 'hexTransfer',
+        hexKey,
+        fromNationIndex,
+        toNationIndex,
+        round: next.currentRound,
+        timestamp: Date.now(),
+      });
+
+      // Adjust trust: +5 for peaceful transfer
+      adjustTrust(next, fromNationIndex, toNationIndex, 3);
+
+      return next;
+    });
+  }, []);
+
+  // ---- DIPLOMATIC INFLUENCE ----
+
+  const adjustJuniorInfluenceStars = useCallback((playerIndex, delta) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const player = next.players[playerIndex];
+      if (!player) return prev;
+      player.influenceStars = Math.max(0, Math.min(JUNIOR_INFLUENCE.max, (player.influenceStars || 0) + delta));
+      return next;
+    });
+  }, []);
+
+  const adjustDiplomaticInfluence = useCallback((playerIndex, delta) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const player = next.players[playerIndex];
+      if (!player) return prev;
+      if (player.diplomaticInfluence !== undefined) {
+        player.diplomaticInfluence = Math.max(DIPLOMATIC_INFLUENCE.min, Math.min(DIPLOMATIC_INFLUENCE.max, player.diplomaticInfluence + delta));
+      }
+      return next;
+    });
+  }, []);
+
+  // ---- DISPUTE MANAGEMENT ----
+
+  const createDispute = useCallback((hexKey, nationA, nationB, reason) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.disputes) next.disputes = [];
+      // Remove existing dispute for this hex
+      next.disputes = next.disputes.filter(d => d.hexKey !== hexKey);
+      next.disputes.push({
+        id: `disp_${Date.now()}`,
+        hexKey,
+        nations: [nationA, nationB],
+        reason,
+        createdRound: next.currentRound,
+        status: 'active',
+        escalation: 1,
+      });
+      if (next.map.hexes[hexKey]) {
+        next.map.hexes[hexKey].disputed = true;
+      }
+      return next;
+    });
+  }, []);
+
+  const resolveDispute = useCallback((disputeId, resolution) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const idx = next.disputes?.findIndex(d => d.id === disputeId);
+      if (idx === undefined || idx === -1) return prev;
+      next.disputes[idx].status = 'resolved';
+      next.disputes[idx].resolution = resolution;
+      next.disputes[idx].resolvedRound = next.currentRound;
+      if (next.map.hexes[next.disputes[idx].hexKey]) {
+        next.map.hexes[next.disputes[idx].hexKey].disputed = false;
+      }
+      if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+      next.diplomacy.history.push({
+        type: 'disputeResolved',
+        disputeId,
+        resolution,
+        round: next.currentRound,
+      });
+      return next;
+    });
+  }, []);
+
+  // ---- MARS COUNCIL ----
+
+  const requestMarsCouncil = useCallback((disputeId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.marsCouncilVotes) next.marsCouncilVotes = [];
+      const dispute = next.disputes?.find(d => d.id === disputeId);
+      if (!dispute) return prev;
+
+      next.marsCouncilVotes.push({
+        id: `council_${Date.now()}`,
+        disputeId,
+        round: next.currentRound,
+        votes: {},
+        status: 'open',
+      });
+      return next;
+    });
+  }, []);
+
+  const castCouncilVote = useCallback((councilId, voterIndex, supportForNationIndex) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const vote = next.marsCouncilVotes?.find(v => v.id === councilId);
+      if (!vote || vote.status !== 'open') return prev;
+      vote.votes[voterIndex] = supportForNationIndex; // nation index, or -1 for abstain
+      return next;
+    });
+  }, []);
+
+  // ---- COOLDOWN CHECK ----
+
+  const getCooldown = useCallback((gameState, fromIdx, toIdx) => {
+    if (!gameState?.conflictCooldowns) return 0;
+    const key = `${Math.min(fromIdx, toIdx)}:${Math.max(fromIdx, toIdx)}`;
+    return gameState.conflictCooldowns[key] || 0;
+  }, []);
+
+  // ---- EXPANDED PROPOSALS ----
+
+  const proposeTerritorialRequest = useCallback((targetIndex, hexKey, offeredResources, requestedResources, offeredHexes, requestedHexes) => {
+    setGameState(prev => {
+      if (!prev || prev.actionPoints <= 0) return prev;
+      const pidx = prev.currentPlayerIndex;
+      if (targetIndex === pidx) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+
+      // Validate offered hexes
+      if (offeredHexes) {
+        for (const hk of offeredHexes) {
+          if (!isHexEligibleForTransfer(hk, pidx, targetIndex, next.map)) return prev;
+        }
+      }
+
+      const proposal = {
+        id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: 'territorialRequest',
+        proposerIndex: pidx,
+        recipientIndex: targetIndex,
+        status: 'pending',
+        createdRound: next.currentRound,
+        offeredResources: offeredResources || {},
+        requestedResources: requestedResources || {},
+        offeredHexes: offeredHexes || [],
+        requestedHexes: requestedHexes || [],
+      };
+
+      next.diplomacy.proposals.push(proposal);
+      next.actionPoints -= 1;
       return next;
     });
   }, []);
@@ -516,6 +791,13 @@ export function GameProvider({ children }) {
           }
         }
 
+        // Cooldown decay: reduce all cooldowns by 1 each round
+        if (next.conflictCooldowns) {
+          Object.keys(next.conflictCooldowns).forEach(k => {
+            if (next.conflictCooldowns[k] > 0) next.conflictCooldowns[k] -= 1;
+          });
+        }
+
         // Expire agreements + alliance trust maintenance
         if (next.diplomacy) {
           next.diplomacy.agreements = next.diplomacy.agreements.map(a => {
@@ -593,6 +875,8 @@ export function GameProvider({ children }) {
       startGame, updateGameState,
       exploreHex, claimHex, buildOnHex, researchTech, giveResource,
       proposeAgreement, acceptProposal, rejectProposal, withdrawProposal, cancelAgreement,
+      transferHex, adjustDiplomaticInfluence, adjustJuniorInfluenceStars, juniorLandExchange, createDispute, resolveDispute,
+      requestMarsCouncil, castCouncilVote, getCooldown, proposeTerritorialRequest,
       endTurn, dismissEvent,
       saveGame, loadGame, getSavedGames, deleteSave,
       // Camera API — stable, never touched by game actions

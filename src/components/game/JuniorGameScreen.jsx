@@ -9,7 +9,8 @@ import CooperationPanel from './CooperationPanel';
 import JuniorMapLegend from './JuniorMapLegend';
 import BuildingGuideModal, { BuildSelectionCards, HexTooltip, JUNIOR_BUILDING_GUIDE, RES_ICON } from './JuniorBuildGuide';
 import { canExploreHex, canClaimHex, canBuildOnHex, isExploredByNation } from '@/lib/gameData';
-import { Save, Search, MapPin, Hammer, FlaskConical, Heart, SkipForward, X, HelpCircle, BookOpen } from 'lucide-react';
+import { Save, Search, MapPin, Hammer, FlaskConical, Heart, SkipForward, X, HelpCircle, BookOpen, AlertTriangle } from 'lucide-react';
+import JuniorDisputePanel from './JuniorDisputePanel';
 
 // Pre-check: are there any valid targets for this action in the current game state?
 function checkValidTargets(actionMode, gameState) {
@@ -42,6 +43,7 @@ export default function JuniorGameScreen() {
   const [showCoop, setShowCoop] = useState(false);
   const [showSave, setShowSave] = useState(false);
   const [showBuildGuide, setShowBuildGuide] = useState(false);
+  const [showDispute, setShowDispute] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [buildMenu, setBuildMenu] = useState(false); // hexKey when build selection open
 
@@ -52,6 +54,7 @@ export default function JuniorGameScreen() {
   const handleAction = (mode) => {
     if (mode === 'research') { setShowResearch(true); setActionMode(null); return; }
     if (mode === 'help') { setShowCoop(true); setActionMode(null); return; }
+    if (mode === 'dispute') { setShowDispute(true); setActionMode(null); return; }
     setActionMsg('');
     if (mode === actionMode) { setActionMode(null); return; }
     const { hasTargets, reason } = checkValidTargets(mode, gameState);
@@ -130,6 +133,7 @@ export default function JuniorGameScreen() {
     { key: 'claim',    emoji: '🏴', icon: MapPin,        label: t.actions.claim,    ap: 1, mapAction: true },
     { key: 'build',    emoji: '🏗️', icon: Hammer,        label: t.actions.build,    ap: 1, mapAction: true },
     { key: 'research', emoji: '🔬', icon: FlaskConical,  label: t.actions.research, ap: 1, mapAction: false },
+    { key: 'dispute',  emoji: '⚖️', icon: AlertTriangle, label: lang === 'ko' ? '분쟁 해결' : 'Resolve Dispute', ap: 0, mapAction: false },
     { key: 'help',     emoji: '🤝', icon: Heart,         label: t.actions.help,     ap: 0, mapAction: false },
   ];
 
@@ -370,6 +374,7 @@ export default function JuniorGameScreen() {
 
       {showResearch && <ResearchPanel onClose={() => setShowResearch(false)} />}
       {showCoop && <CooperationPanel onClose={() => setShowCoop(false)} />}
+      {showDispute && <JuniorDisputePanel onClose={() => setShowDispute(false)} />}
       <EventModal />
       <SaveLoadModal isOpen={showSave} onClose={() => setShowSave(false)} />
     </div>

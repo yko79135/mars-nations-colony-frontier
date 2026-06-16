@@ -283,6 +283,249 @@ export function adjustTrust(gameState, a, b, delta) {
 
 export const DIPLOMACY_RESOURCES = ['energy', 'water', 'food', 'minerals', 'science'];
 
+// ============ DIPLOMATIC INFLUENCE ============
+
+export const DIPLOMATIC_INFLUENCE = {
+  initial: 50,
+  max: 100,
+  min: 0,
+
+  gains: {
+    completeFairTrade: 3,
+    helpOtherColony: 4,
+    honorAgreement: 2,
+    maintainAlliance: 2,
+    leadSharedProject: 5,
+    majorScienceAchievement: 8,
+    resolveCrisis: 5,
+    strongLivingConditions: 3,
+    supportWeakerNation: 6,
+    marsCouncilComply: 4,
+    successfulMediation: 5,
+    ceasefireOffer: 4,
+  },
+
+  costs: {
+    breakAgreement: 15,
+    unreasonableDemand: 5,
+    startClash: 20,
+    violateNonAggression: 25,
+    takeTerritoryByForce: 12,
+    refuseObligations: 8,
+    causeHumanitarianCrisis: 18,
+    applyEconomicPressure: 5,
+    issueUltimatum: 12,
+    ignoreMarsCouncil: 10,
+    repeatedPressure: 8,
+  },
+
+  thresholds: {
+    applyDiplomaticPressure: 40,
+    issueUltimatum: 55,
+    requestMarsCouncil: 20,
+    marsCouncilVote: 30,
+  },
+};
+
+// Junior Influence Stars
+export const JUNIOR_INFLUENCE = {
+  initial: 2,
+  max: 5,
+
+  gains: {
+    helpAnotherNation: 1,
+    completeSharedProject: 1,
+    keepPromise: 1,
+    discoverImportantLocation: 1,
+    successfulColony: 1,
+  },
+
+  costs: {
+    strongRequest: 1,
+    marsCouncilVote: 2,
+    challenge: 0,
+  },
+};
+
+// ============ SECURITY CAPACITY ============
+
+export function calculateSecurityCapacity(player, map) {
+  if (!player || !map) return 0;
+  let base = 5; // baseline
+
+  // Population contribution
+  base += Math.floor((player.resources.population || 0) / 10);
+
+  // Resource contributions
+  base += Math.floor((player.resources.energy || 0) / 5);
+  base += Math.floor((player.resources.minerals || 0) / 3);
+
+  // Technology bonuses
+  if (player.technologies?.includes('robotics')) base += 4;
+  if (player.technologies?.includes('smallNuclear')) base += 3;
+  if (player.technologies?.includes('longRangeRovers') || player.technologies?.includes('longRangeRover')) base += 2;
+  if (player.technologies?.includes('governance')) base += 3;
+
+  // Building contributions
+  let securityBuildings = 0;
+  Object.values(map.hexes).forEach(hex => {
+    if (hex.owner !== player.index) return;
+    if (hex.buildings.includes('factory')) securityBuildings += 2;
+    if (hex.buildings.includes('commsCenter')) securityBuildings += 1;
+    if (hex.buildings.includes('roverStation')) securityBuildings += 1;
+    if (hex.buildings.includes('spaceport')) securityBuildings += 3;
+  });
+  base += securityBuildings;
+
+  // Morale bonus
+  base += Math.floor((player.resources.morale || 50) / 25);
+
+  return Math.max(0, base);
+}
+
+// ============ CONFLICT STRENGTH ============
+
+export function calculateConflictStrength(player, committedEnergy, committedMinerals, hex, map, gameState) {
+  if (!player) return 0;
+  const baseSecurity = calculateSecurityCapacity(player, map);
+
+  let techBonus = 0;
+  if (player.technologies?.includes('robotics')) techBonus += 3;
+  if (player.technologies?.includes('advancedMining')) techBonus += 2;
+  if (player.technologies?.includes('pressurizedRoads')) techBonus += 2;
+
+  let terrainBonus = 0;
+  if (hex) {
+    if (hex.terrain === 'mountain') terrainBonus += 4;
+    if (hex.terrain === 'canyon') terrainBonus += 3;
+    if (hex.terrain === 'crater') terrainBonus += 2;
+  }
+
+  let allianceSupport = 0;
+  if (gameState?.diplomacy?.agreements) {
+    gameState.diplomacy.agreements.forEach(a => {
+      if (a.status === 'active' && a.type === 'alliance' && a.nationIds.includes(player.index)) {
+        allianceSupport += 3;
+      }
+    });
+  }
+
+  const moraleMod = Math.floor(((player.resources.morale || 50) - 50) / 10);
+
+  const randomModifier = Math.floor(Math.random() * 5) + 1; // small: 1-5
+
+  return (
+    baseSecurity +
+    (committedEnergy || 0) +
+    (committedMinerals || 0) +
+    techBonus +
+    terrainBonus +
+    allianceSupport +
+    moraleMod +
+    randomModifier
+  );
+}
+
+// ============ HEX TRANSFER VALIDATORS ============
+
+export function isBorderHex(hexKey, nationIndex, map) {
+  const hex = map?.hexes[hexKey];
+  if (!hex || hex.owner !== nationIndex) return false;
+  if (hex.isCapital) return false;
+
+  const [q, r] = hexKey.split(',').map(Number);
+  const neighbors = getHexNeighbors(q, r);
+
+  return neighbors.some(n => {
+    const nk = `${n.q},${n.r}`;
+    const nHex = map.hexes[nk];
+    // Border: adjacent to unclaimed tile OR another nation's tile
+    return nHex && (nHex.owner === null || nHex.owner === undefined || nHex.owner !== nationIndex);
+  });
+}
+
+export function isHexAdjacentToNation(hexKey, nationIndex, map) {
+  const hex = map?.hexes[hexKey];
+  if (!hex) return false;
+  if (hex.owner === nationIndex) return false; // Already owned
+
+  const [q, r] = hexKey.split(',').map(Number);
+  const neighbors = getHexNeighbors(q, r);
+
+  return neighbors.some(n => {
+    const nk = `${n.q},${n.r}`;
+    const nHex = map.hexes[nk];
+    return nHex && nHex.owner === nationIndex;
+  });
+}
+
+// Flood fill from capital to check connectivity
+export function wouldTransferDisconnectCapital(hexKey, nationIndex, map) {
+  const playerHexes = Object.entries(map.hexes)
+    .filter(([k, h]) => h.owner === nationIndex && k !== hexKey)
+    .map(([k]) => k);
+
+  if (playerHexes.length <= 1) return false; // Only one hex left, no split possible
+
+  // Find capital
+  const capitalKey = Object.entries(map.hexes).find(([k, h]) => h.owner === nationIndex && h.isCapital)?.[0];
+  if (!capitalKey) return false;
+  if (capitalKey === hexKey) return true; // Can't transfer the capital itself
+
+  // BFS from capital without the transferred hex
+  const visited = new Set();
+  const queue = [capitalKey];
+  visited.add(capitalKey);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const [cq, cr] = current.split(',').map(Number);
+    const neighbors = getHexNeighbors(cq, cr);
+
+    for (const n of neighbors) {
+      const nk = `${n.q},${n.r}`;
+      if (visited.has(nk)) continue;
+      if (nk === hexKey) continue; // Skip the transferred hex
+      const nHex = map.hexes[nk];
+      if (nHex && nHex.owner === nationIndex) {
+        visited.add(nk);
+        queue.push(nk);
+      }
+    }
+  }
+
+  // Check if all other player hexes are reachable
+  return playerHexes.some(k => !visited.has(k));
+}
+
+export function isHexEligibleForTransfer(hexKey, fromNationIndex, toNationIndex, map) {
+  const hex = map?.hexes[hexKey];
+  if (!hex) return false;
+  if (hex.owner !== fromNationIndex) return false;
+  if (hex.isCapital) return false;
+
+  // Must be a border hex
+  if (!isBorderHex(hexKey, fromNationIndex, map)) return false;
+
+  // Must not disconnect the sender's capital
+  if (wouldTransferDisconnectCapital(hexKey, fromNationIndex, map)) return false;
+
+  // Receiver must be adjacent (for initial implementation)
+  if (!isHexAdjacentToNation(hexKey, toNationIndex, map)) return false;
+
+  return true;
+}
+
+export function getEligibleHexesForTransfer(fromNationIndex, toNationIndex, map) {
+  const eligible = [];
+  Object.entries(map.hexes).forEach(([key, hex]) => {
+    if (hex.owner === fromNationIndex && isHexEligibleForTransfer(key, fromNationIndex, toNationIndex, map)) {
+      eligible.push(key);
+    }
+  });
+  return eligible;
+}
+
 // ============ EVENTS ============
 
 export const EVENTS = [
@@ -558,6 +801,7 @@ export function createInitialGameState(settings, nations) {
         technologies: [],
         agreements: [],
         cooperationActions: 0,
+        influenceStars: 2,
         scores: { territory: 1, science: 0, cooperation: 0, development: 0 },
         capitalHex: hexKey,
       };
@@ -570,6 +814,7 @@ export function createInitialGameState(settings, nations) {
       resources: { ...res },
       technologies: [],
       agreements: [],
+      diplomaticInfluence: 50,
       scores: { territory: 1, science: 0, population: res.population || 0, livingConditions: 50, economic: 0, cooperation: 0, sustainability: 0, achievement: 0 },
       capitalHex: hexKey,
     };
@@ -593,6 +838,9 @@ export function createInitialGameState(settings, nations) {
       history: [],
       trust: {},
     },
+    disputes: [],
+    conflictCooldowns: {},
+    marsCouncilVotes: [],
   };
 }
 

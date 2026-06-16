@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
 import { getTrust, getTrustLabel, TRUST_LABELS } from '@/lib/gameData';
-import { ChevronLeft, Users, ArrowRightLeft, Shield, Share2, Heart, CheckCircle } from 'lucide-react';
+import { ChevronLeft, Users, ArrowRightLeft, Shield, Share2, Heart, CheckCircle, AlertTriangle } from 'lucide-react';
+import ConflictPanel from './ConflictPanel';
 import TradeForm from './TradeForm';
 import AllianceForm from './AllianceForm';
 import NonAggressionForm from './NonAggressionForm';
@@ -32,6 +33,7 @@ export default function DiplomacyPanel() {
   const [targetPlayer, setTargetPlayer] = useState(null);
   const [activeForm, setActiveForm] = useState(null); // 'trade' | 'alliance' | etc
   const [showAgreements, setShowAgreements] = useState(false);
+  const [showConflict, setShowConflict] = useState(false);
   const [flash, setFlash] = useState(null);
 
   if (!gameState) return null;
@@ -47,6 +49,9 @@ export default function DiplomacyPanel() {
 
   if (showAgreements) {
     return <ActiveAgreementsList onClose={() => setShowAgreements(false)} />;
+  }
+  if (showConflict) {
+    return <ConflictPanel onClose={() => setShowConflict(false)} />;
   }
 
   return (
