@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
-import { getTrust, getTrustLabel, TRUST_LABELS, DIPLOMATIC_INFLUENCE, isHexEligibleForTransfer, isBorderHex } from '@/lib/gameData';
+import { getTrust, getTrustLabel, TRUST_LABELS, DIPLOMATIC_INFLUENCE, canPressurizeHex, getPressureCost } from '@/lib/gameData';
 import { ChevronLeft, AlertTriangle, Gavel, Shield, Zap, Handshake } from 'lucide-react';
 import HexTradePicker from './HexTradePicker';
 
 export default function ConflictPanel() {
   const { t, lang } = useLang();
-  const { gameState, setScreen, proposeTerritorialRequest, requestMarsCouncil, createDispute } = useGame();
+  const { gameState, setScreen, proposeTerritorialRequest, requestMarsCouncil, createDispute, pressurizeHex, resistPressure, surrenderPressure } = useGame();
   const [tab, setTab] = useState('negotiate');
   const [targetPlayer, setTargetPlayer] = useState(null);
   const [offeredRes, setOfferedRes] = useState({});
@@ -204,39 +204,140 @@ export default function ConflictPanel() {
           {/* ============ PRESSURE TAB ============ */}
           {tab === 'pressure' && (
             <>
-              <div className="p-4 rounded-xl" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                <h3 className="text-white font-heading font-bold text-sm mb-2">{lang === 'ko' ? '외교 압박' : 'Diplomatic Pressure'}</h3>
-                <p className="text-xs text-gray-400 mb-3">
+              {/* Influence overview */}
+              <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <h3 className="text-white font-heading font-bold text-sm mb-2">{t.diplomacy.pressure}</h3>
+                <p className="text-xs text-gray-400 mb-2">
                   {lang === 'ko'
-                    ? `필요 외교 영향력: ${DIPLOMATIC_INFLUENCE.thresholds.applyDiplomaticPressure} (현재: ${player.diplomaticInfluence || 50})`
-                    : `Required Influence: ${DIPLOMATIC_INFLUENCE.thresholds.applyDiplomaticPressure} (Current: ${player.diplomaticInfluence || 50})`}
+                    ? `현재 외교 영향력: ${player.diplomaticInfluence || 50}. 비용 = 15 + 건물당 5.`
+                    : `Current Influence: ${player.diplomaticInfluence || 50}. Cost = 15 + 5 per building.`}
                 </p>
-                <p className="text-[10px] text-yellow-400/70">
+                <p className="text-[10px] text-gray-500">
                   {lang === 'ko'
-                    ? '외교 압박을 가하면 상대 국가는 수락, 거절, 역제안, 또는 중재 요청 중 선택할 수 있습니다.'
-                    : 'Pressure lets the target accept, reject, counter, or request mediation.'}
+                    ? '영향력은 즉시 소모됩니다. 상대는 3턴 안에 맞서야 합니다. 동맹/불가침 대상은 압박 불가.'
+                    : 'Influence committed immediately. Owner has 3 turns to match. Cannot pressure allies/pact partners.'}
                 </p>
               </div>
 
+              {/* Select target */}
               {!targetPlayer && (
                 <p className="text-xs text-gray-600 text-center py-4">
                   {lang === 'ko' ? '협상 탭에서 대상을 먼저 선택하세요.' : 'Select a target nation in the Negotiate tab first.'}
                 </p>
               )}
+
               {targetPlayer && (
-                <div className="space-y-2">
-                  <button onClick={handleInitiateDispute}
-                    className="w-full py-2.5 rounded-xl text-sm font-heading font-bold transition-all"
-                    style={{ background: 'rgba(251,191,36,0.2)', border: '1px solid rgba(251,191,36,0.35)', color: '#fde68a' }}>
-                    ⚡ {lang === 'ko' ? '분쟁 등록' : 'Register Dispute'}
-                  </button>
-                  <div className="mt-2">
-                    <input type="text" value={disputeReason}
-                      onChange={e => setDisputeReason(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-yellow-500"
-                      placeholder={lang === 'ko' ? '분쟁 사유...' : 'Dispute reason...'}
-                    />
+                <>
+                  {/* Pressure hexes list */}
+                  <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                    <h4 className="text-white font-heading font-bold text-xs mb-2">
+                      {lang === 'ko'
+                        ? `${gameState.players[targetPlayer].countryName}의 압박 가능 헥스`
+                        : `Pressure Targets — ${gameState.players[targetPlayer].countryName}`}
+                    </h4>
+                    {Object.entries(gameState.map.hexes)
+                      .filter(([k, h]) => canPressurizeHex(gameState, pidx, k))
+                      .slice(0, 10)
+                      .map(([hk, hex]) => {
+                        const cost = getPressureCost(hex, gameState);
+                        const canAfford = (player.diplomaticInfluence || 0) >= cost;
+                        return (
+                          <button key={hk}
+                            onClick={() => { if (canAfford && gameState.actionPoints > 0) { pressurizeHex(hk); showFlash(t.diplomacy.pressureSent); } }}
+                            disabled={!canAfford || gameState.actionPoints <= 0}
+                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs mb-1 transition-all disabled:opacity-30 text-left"
+                            style={{
+                              background: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.06)',
+                              color: canAfford ? '#fca5a5' : '#6b7280',
+                            }}>
+                            <span>{gameState.players[targetPlayer].emblem}</span>
+                            <span className="flex-1">({hk})</span>
+                            {hex.buildings?.length > 0 && (
+                              <span className="text-[8px] text-yellow-500">{hex.buildings.length} {lang === 'ko' ? '건물' : 'bldgs'}</span>
+                            )}
+                            <span className="text-[9px] font-mono" style={{ color: canAfford ? '#fbbf24' : '#f87171' }}>
+                              {cost} inf
+                            </span>
+                          </button>
+                        );
+                      })}
+                    {Object.entries(gameState.map.hexes).filter(([k, h]) => canPressurizeHex(gameState, pidx, k)).length === 0 && (
+                      <p className="text-gray-600 text-xs text-center py-2">{t.diplomacy.pressureNoValidHexes}</p>
+                    )}
                   </div>
+                </>
+              )}
+
+              {/* Active pressures — incoming (for current player to respond to) */}
+              {(gameState.pendingPressures || []).filter(p => p.status === 'active' && p.defenderIdx === pidx).length > 0 && (
+                <div className="rounded-xl p-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                  <h4 className="text-white font-heading font-bold text-xs mb-2">
+                    {lang === 'ko' ? '받은 압박' : 'Incoming Pressure'}
+                  </h4>
+                  {(gameState.pendingPressures || []).filter(p => p.status === 'active' && p.defenderIdx === pidx).map(p => {
+                    const attacker = gameState.players[p.attackerIdx];
+                    const hex = gameState.map.hexes[p.hexKey];
+                    return (
+                      <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg mb-1"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ color: attacker?.colorHex }}>{attacker?.emblem}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-white truncate">{attacker?.countryName} → ({p.hexKey})</p>
+                          <p className="text-[9px] text-gray-500">
+                            {lang === 'ko' ? `비용: ${p.cost}  ·  남은 턴: ${p.defenderTurnsRemaining}` : `Cost: ${p.cost}  ·  ${p.defenderTurnsRemaining} turns left`}
+                          </p>
+                        </div>
+                        <button onClick={() => resistPressure(p.id)}
+                          disabled={(player.diplomaticInfluence || 0) < p.cost}
+                          className="px-2 py-1 rounded text-[10px] font-bold transition-all disabled:opacity-30"
+                          style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.25)', color: '#86efac' }}>
+                          {t.diplomacy.resist}
+                        </button>
+                        <button onClick={() => surrenderPressure(p.id)}
+                          className="px-2 py-1 rounded text-[10px] font-bold transition-all"
+                          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5' }}>
+                          {t.diplomacy.surrender}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Active pressures — outgoing (pressures the player initiated) */}
+              {(gameState.pendingPressures || []).filter(p => p.status === 'active' && p.attackerIdx === pidx).length > 0 && (
+                <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                  <h4 className="text-white font-heading font-bold text-xs mb-2">
+                    {lang === 'ko' ? '가한 압박' : 'Outgoing Pressure'}
+                  </h4>
+                  {(gameState.pendingPressures || []).filter(p => p.status === 'active' && p.attackerIdx === pidx).map(p => {
+                    const defender = gameState.players[p.defenderIdx];
+                    return (
+                      <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg mb-1"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ color: defender?.colorHex }}>{defender?.emblem}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-white truncate">→ {defender?.countryName} ({p.hexKey})</p>
+                          <p className="text-[9px] text-gray-500">
+                            {lang === 'ko' ? `비용: ${p.cost}  ·  남은 턴: ${p.defenderTurnsRemaining}` : `Cost: ${p.cost}  ·  ${p.defenderTurnsRemaining} turns left`}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Coalition Support */}
+              {otherPlayers.length > 1 && (gameState.pendingPressures || []).some(p => p.status === 'active' && p.defenderIdx === pidx) && (
+                <div className="rounded-xl p-4" style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)' }}>
+                  <h4 className="text-white font-heading font-bold text-xs mb-2">{t.diplomacy.coalitionSupport}</h4>
+                  <p className="text-[10px] text-gray-400">
+                    {lang === 'ko'
+                      ? '다른 국가에 영향력 지원을 요청할 수 있습니다. 동맹국이 요청에 응할 가능성이 높습니다.'
+                      : 'You can request influence support from other nations. Allies are more likely to respond.'}
+                  </p>
                 </div>
               )}
             </>

@@ -267,6 +267,15 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
             <stop offset="0%" stopColor="#1a1020" />
             <stop offset="100%" stopColor="#0a0810" />
           </radialGradient>
+          {/* Pressure stripe pattern */}
+          <pattern id="pressure-stripes" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+            <rect width="8" height="8" fill="transparent" />
+            <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(239,68,68,0.35)" strokeWidth="3" />
+          </pattern>
+          <pattern id="pressure-stripes-outgoing" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(-45)">
+            <rect width="8" height="8" fill="transparent" />
+            <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(251,191,36,0.35)" strokeWidth="3" />
+          </pattern>
         </defs>
 
         {/* Space background */}
@@ -345,6 +354,20 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
                 {ownerColor && isVisible && (
                   <polygon points={points} fill={ownerColor} opacity={0.12} stroke="none" />
                 )}
+
+                {/* Pressure overlay — striped for pressured hexes */}
+                {isVisible && (() => {
+                  const pendingPressures = gameState?.pendingPressures || [];
+                  const isPressuredIncoming = pendingPressures.some(p => p.status === 'active' && p.hexKey === key && p.defenderIdx === pidx);
+                  const isPressuredOutgoing = pendingPressures.some(p => p.status === 'active' && p.hexKey === key && p.attackerIdx === pidx);
+                  if (isPressuredIncoming) {
+                    return <polygon points={points} fill="url(#pressure-stripes)" stroke="none" />;
+                  }
+                  if (isPressuredOutgoing) {
+                    return <polygon points={points} fill="url(#pressure-stripes-outgoing)" stroke="none" />;
+                  }
+                  return null;
+                })()}
 
                 {isValid && !isSelected && (
                   <polygon points={points}

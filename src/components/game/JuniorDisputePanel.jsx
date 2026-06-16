@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useLang } from '@/lib/i18n';
 import { useGame } from '@/lib/gameContext';
-import { isHexEligibleForTransfer, getHexNeighbors } from '@/lib/gameData';
-import { ChevronLeft, Handshake, MapPin, Star, Gavel, Swords } from 'lucide-react';
+import { canPressurizeHex, getPressureCost, getHexNeighbors } from '@/lib/gameData';
+import { ChevronLeft, Handshake, MapPin, Star, Gavel, Zap } from 'lucide-react';
 
 const RES_ICONS = { energy: '⚡', water: '💧', food: '🌾', minerals: '💎', science: '🔬' };
 const TERRAIN_ICONS = {
@@ -13,14 +13,12 @@ const TERRAIN_ICONS = {
 
 export default function JuniorDisputePanel({ onClose }) {
   const { t, lang } = useLang();
-  const { gameState, giveResource, transferHex, adjustJuniorInfluenceStars, juniorLandExchange } = useGame();
+  const { gameState, giveResource, adjustJuniorInfluenceStars, juniorLandExchange, pressurizeHex, resistPressure, surrenderPressure } = useGame();
   const [tab, setTab] = useState('request');
   const [targetPlayer, setTargetPlayer] = useState(null);
   const [resource, setResource] = useState('minerals');
   const [amount, setAmount] = useState('');
   const [selectedHex, setSelectedHex] = useState(null);
-  const [challengeRes, setChallengeRes] = useState('');
-  const [challengeAmt, setChallengeAmt] = useState(0);
   const [flash, setFlash] = useState(null);
 
   if (!gameState) return null;
@@ -58,14 +56,16 @@ export default function JuniorDisputePanel({ onClose }) {
     showFlash(lang === 'ko' ? '화성 위원회에 요청했습니다!' : 'Mars Council requested!');
   };
 
-  const handlePeacefulChallenge = () => {
-    if (!targetPlayer || challengeAmt <= 0) return;
-    const myRoll = Math.floor(Math.random() * 3) + challengeAmt;
-    const theirRoll = Math.floor(Math.random() * 3) + 2;
-    const result = myRoll > theirRoll ? 'win' : myRoll < theirRoll ? 'lose' : 'tie';
-    showFlash(lang === 'ko'
-      ? `결과: ${result === 'win' ? '승리!' : result === 'lose' ? '패배...' : '무승부'} (${myRoll} vs ${theirRoll})`
-      : `Result: ${result === 'win' ? 'You win!' : result === 'lose' ? 'You lose...' : 'Tie'} (${myRoll} vs ${theirRoll})`);
+  const handlePressurizeHex = (hexKey) => {
+    if (!targetPlayer || gameState.actionPoints <= 0) return;
+    const hex = gameState.map.hexes[hexKey];
+    const cost = getPressureCost(hex, gameState);
+    if ((player.influenceStars || 0) < cost) {
+      showFlash(lang === 'ko' ? `영향력이 부족합니다! (필요: ${cost})` : `Not enough Influence! (Need: ${cost})`);
+      return;
+    }
+    pressurizeHex(hexKey);
+    showFlash(lang === 'ko' ? '압박을 가했습니다!' : 'Pressure applied!');
   };
 
   const JUNIOR_RESOURCES = ['energy', 'water', 'food', 'minerals'];
@@ -73,9 +73,9 @@ export default function JuniorDisputePanel({ onClose }) {
   const ACTIONS = [
     { key: 'request',  icon: Handshake,  color: '#60a5fa', en: 'Friendly Request',  ko: '우호 요청',    costStars: 0 },
     { key: 'land',     icon: MapPin,      color: '#4ade80', en: 'Trade Land',        ko: '땅 교환',      costStars: 0 },
+    { key: 'pressure', icon: Zap,         color: '#f87171', en: 'Pressure Hex',      ko: '헥스 압박',    costStars: 0 },
     { key: 'strong',   icon: Star,        color: '#fbbf24', en: 'Use Influence',     ko: '영향력 사용',  costStars: 1 },
     { key: 'council',  icon: Gavel,       color: '#a78bfa', en: 'Mars Council',      ko: '화성 위원회',  costStars: 2 },
-    { key: 'challenge',icon: Swords,      color: '#fb923c', en: 'Peaceful Challenge',ko: '평화 경쟁',    costStars: 0 },
   ];
 
   return (
@@ -289,40 +289,113 @@ export default function JuniorDisputePanel({ onClose }) {
           </div>
         )}
 
-        {/* Peaceful Challenge */}
-        {tab === 'challenge' && targetPlayer && (
-          <div className="rounded-xl p-4" style={{ background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.2)' }}>
-            <h3 className="text-white font-heading font-bold text-sm mb-3">{lang === 'ko' ? '평화 경쟁' : 'Peaceful Challenge'}</h3>
-            <p className="text-xs text-gray-400 mb-3">
+        {/* Pressure Hex */}
+        {tab === 'pressure' && targetPlayer && (
+          <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <h3 className="text-white font-heading font-bold text-sm mb-2">
               {lang === 'ko'
-                ? `${gameState.players[targetPlayer].countryName}과(와) 자원을 걸고 경쟁합니다. 각자 자원을 걸고, 더 높은 합계를 가진 쪽이 승리합니다.`
-                : `Compete with ${gameState.players[targetPlayer].countryName}. Each side commits resources; highest support wins.`}
+                ? `${gameState.players[targetPlayer].countryName}의 헥스 압박`
+                : `Pressure ${gameState.players[targetPlayer].countryName}'s Hex`}
+            </h3>
+            <p className="text-[10px] text-gray-500 mb-3">
+              {lang === 'ko'
+                ? '비용 = 기본 2 + 건물당 1. 영향력은 즉시 소모됩니다. 상대는 3턴 안에 맞서야 합니다.'
+                : 'Cost = 2 base + 1 per building. Influence committed immediately. Owner has 3 turns to match.'}
             </p>
-            <div className="flex items-center gap-2 mb-3">
-              <select value={resource} onChange={e => setResource(e.target.value)}
-                className="px-3 py-2 text-xs rounded-lg bg-gray-800 border border-gray-700 text-white">
-                {JUNIOR_RESOURCES.map(r => (
-                  <option key={r} value={r}>{RES_ICONS[r]} {t.resources[r]}</option>
-                ))}
-              </select>
-              <input type="number" min="1" value={challengeAmt || ''}
-                onChange={e => setChallengeAmt(parseInt(e.target.value) || 0)}
-                className="w-20 px-2 py-2 text-xs rounded-lg bg-gray-800 border border-gray-700 text-white"
-                placeholder="0"
-              />
-            </div>
-            <button onClick={handlePeacefulChallenge} disabled={challengeAmt <= 0}
-              className="w-full py-2.5 rounded-xl text-sm font-heading font-bold transition-all disabled:opacity-40"
-              style={{ background: 'rgba(251,146,60,0.25)', border: '1px solid rgba(251,146,60,0.4)', color: '#fed7aa' }}>
-              {lang === 'ko' ? '경쟁 시작' : 'Start Challenge'}
-            </button>
+
+            {/* List eligible pressure targets */}
+            {Object.entries(gameState.map.hexes)
+              .filter(([k, h]) => canPressurizeHex(gameState, pidx, k))
+              .slice(0, 10)
+              .map(([hk, hex]) => {
+                const cost = getPressureCost(hex, gameState);
+                const canAfford = (player.influenceStars || 0) >= cost;
+                const isSelected = selectedHex === hk;
+                return (
+                  <button key={hk} onClick={() => setSelectedHex(isSelected ? null : hk)}
+                    disabled={!canAfford}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs mb-1 transition-all disabled:opacity-30"
+                    style={{
+                      background: isSelected ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${isSelected ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                      color: isSelected ? '#fca5a5' : '#9ca3af',
+                    }}>
+                    <span>{TERRAIN_ICONS[hex.terrain] || '🪨'}</span>
+                    <span className="flex-1 text-left">{t.terrain[hex.terrain]}</span>
+                    {hex.buildings?.length > 0 && (
+                      <span className="text-[8px] text-yellow-500">{hex.buildings.length} {lang === 'ko' ? '건물' : 'bldgs'}</span>
+                    )}
+                    <span className="text-[9px] font-mono" style={{ color: canAfford ? '#fbbf24' : '#f87171' }}>
+                      ⭐{cost}
+                    </span>
+                  </button>
+                );
+              })}
+
+            {Object.entries(gameState.map.hexes).filter(([k, h]) => canPressurizeHex(gameState, pidx, k)).length === 0 && (
+              <p className="text-gray-600 text-xs text-center py-3">
+                {lang === 'ko' ? '압박 가능한 인접 적국 변경 헥스가 없습니다.' : 'No adjacent enemy border hexes available.'}
+              </p>
+            )}
+
+            {selectedHex && (() => {
+              const hex = gameState.map.hexes[selectedHex];
+              const cost = getPressureCost(hex, gameState);
+              return (
+                <button onClick={() => handlePressurizeHex(selectedHex)}
+                  disabled={(player.influenceStars || 0) < cost || gameState.actionPoints <= 0}
+                  className="w-full mt-3 py-2.5 rounded-xl text-sm font-heading font-bold transition-all disabled:opacity-40"
+                  style={{ background: 'rgba(239,68,68,0.25)', border: '1px solid rgba(239,68,68,0.4)', color: '#fca5a5' }}>
+                  {lang === 'ko'
+                    ? `압박하기 (⭐${cost}, 1 AP)`
+                    : `Apply Pressure (⭐${cost}, 1 AP)`}
+                </button>
+              );
+            })()}
           </div>
         )}
 
-        {!targetPlayer && (
+
+        {!targetPlayer && tab !== 'council' && (
           <p className="text-gray-600 text-sm text-center py-8">
             {lang === 'ko' ? '먼저 대화할 국가를 선택하세요.' : 'Select a nation to interact with first.'}
           </p>
+        )}
+
+        {/* Active incoming pressures (for defender response) */}
+        {(gameState.pendingPressures || []).filter(p => p.status === 'active' && p.defenderIdx === pidx).length > 0 && (
+          <div className="rounded-xl p-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+            <h4 className="text-white font-heading font-bold text-xs mb-2">
+              {lang === 'ko' ? '받은 압박' : 'Incoming Pressure'}
+            </h4>
+            {(gameState.pendingPressures || []).filter(p => p.status === 'active' && p.defenderIdx === pidx).map(p => {
+              const attacker = gameState.players[p.attackerIdx];
+              const hex = gameState.map.hexes[p.hexKey];
+              return (
+                <div key={p.id} className="flex items-center gap-2 p-2 rounded-lg mb-1"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ color: attacker?.colorHex }}>{attacker?.emblem}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-white truncate">{attacker?.countryName} → {t.terrain[hex?.terrain]}</p>
+                    <p className="text-[9px] text-gray-500">
+                      {lang === 'ko' ? `비용 ⭐${p.cost} · 남은 턴 ${p.defenderTurnsRemaining}` : `⭐${p.cost} · ${p.defenderTurnsRemaining} turns left`}
+                    </p>
+                  </div>
+                  <button onClick={() => { resistPressure(p.id); showFlash(lang === 'ko' ? '압박에 저항했습니다!' : 'Pressure resisted!'); }}
+                    disabled={(player.influenceStars || 0) < p.cost}
+                    className="px-2 py-1 rounded text-[9px] font-bold transition-all disabled:opacity-30"
+                    style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.25)', color: '#86efac' }}>
+                    {lang === 'ko' ? '저항' : 'Resist'}
+                  </button>
+                  <button onClick={() => { surrenderPressure(p.id); showFlash(lang === 'ko' ? '헥스를 포기했습니다!' : 'Hex surrendered!'); }}
+                    className="px-2 py-1 rounded text-[9px] font-bold transition-all"
+                    style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5' }}>
+                    {lang === 'ko' ? '포기' : 'Give Up'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
