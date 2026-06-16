@@ -225,6 +225,32 @@ export function GameProvider({ children }) {
     });
   }, []);
 
+  // ---- JUNIOR TRADE ----
+
+  const proposeJuniorTrade = useCallback((recipientIndex, offeredResources, requestedResources) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const pidx = prev.currentPlayerIndex;
+      if (recipientIndex === pidx) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
+
+      const proposal = {
+        id: `trade_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: 'trade',
+        proposerIndex: pidx,
+        recipientIndex,
+        status: 'pending',
+        createdRound: next.currentRound,
+        offeredResources: offeredResources || {},
+        requestedResources: requestedResources || {},
+      };
+
+      next.diplomacy.proposals.push(proposal);
+      return next;
+    });
+  }, []);
+
   // ---- COOPERATION (Junior) ----
 
   const giveResource = useCallback((toPlayerIndex, resource, amount) => {
@@ -996,7 +1022,7 @@ export function GameProvider({ children }) {
       proposeAgreement, acceptProposal, rejectProposal, withdrawProposal, cancelAgreement,
       transferHex, adjustDiplomaticInfluence, adjustJuniorInfluenceStars, juniorLandExchange, createDispute, resolveDispute,
       requestMarsCouncil, castCouncilVote, getCooldown, proposeTerritorialRequest,
-      pressurizeHex, resistPressure, surrenderPressure,
+      pressurizeHex, resistPressure, surrenderPressure, proposeJuniorTrade,
       endTurn, dismissEvent,
       saveGame, loadGame, getSavedGames, deleteSave,
       // Camera API — stable, never touched by game actions

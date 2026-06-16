@@ -8,9 +8,9 @@ import ResearchPanel from './ResearchPanel';
 import CooperationPanel from './CooperationPanel';
 import JuniorMapLegend from './JuniorMapLegend';
 import BuildingGuideModal, { BuildSelectionCards, HexTooltip, JUNIOR_BUILDING_GUIDE, RES_ICON } from './JuniorBuildGuide';
-import { canExploreHex, canClaimHex, canBuildOnHex, isExploredByNation } from '@/lib/gameData';
+import { canExploreHex, canClaimHex, canBuildOnHex, isExploredByNation, canPressurizeHex, calculateInfluenceAccrual } from '@/lib/gameData';
 import { Save, Search, MapPin, Hammer, FlaskConical, Heart, SkipForward, X, HelpCircle, BookOpen, AlertTriangle } from 'lucide-react';
-import JuniorDisputePanel from './JuniorDisputePanel';
+import JuniorDiplomacyPanel from './JuniorDiplomacyPanel';
 
 // Pre-check: are there any valid targets for this action in the current game state?
 function checkValidTargets(actionMode, gameState) {
@@ -43,7 +43,10 @@ export default function JuniorGameScreen() {
   const [showCoop, setShowCoop] = useState(false);
   const [showSave, setShowSave] = useState(false);
   const [showBuildGuide, setShowBuildGuide] = useState(false);
-  const [showDispute, setShowDispute] = useState(false);
+  const [showDiplomacy, setShowDiplomacy] = useState(false);
+  const [diplomacyPressureMode, setDiplomacyPressureMode] = useState(false);
+  const [diplomacyPressureTarget, setDiplomacyPressureTarget] = useState(null);
+  const [diplomacySelectedPressureHex, setDiplomacySelectedPressureHex] = useState(null);
   const [actionMsg, setActionMsg] = useState('');
   const [buildMenu, setBuildMenu] = useState(false); // hexKey when build selection open
 
@@ -54,7 +57,7 @@ export default function JuniorGameScreen() {
   const handleAction = (mode) => {
     if (mode === 'research') { setShowResearch(true); setActionMode(null); return; }
     if (mode === 'help') { setShowCoop(true); setActionMode(null); return; }
-    if (mode === 'dispute') { setShowDispute(true); setActionMode(null); return; }
+    if (mode === 'diplomacy') { setShowDiplomacy(true); setActionMode(null); return; }
     setActionMsg('');
     if (mode === actionMode) { setActionMode(null); return; }
     const { hasTargets, reason } = checkValidTargets(mode, gameState);
@@ -72,6 +75,16 @@ export default function JuniorGameScreen() {
     if (!hex) return;
 
     const pidx = gameState.currentPlayerIndex;
+
+    // Diplomacy pressure hex selection
+    if (diplomacyPressureMode) {
+      if (canPressurizeHex(gameState, pidx, hexKey)) {
+        setDiplomacySelectedPressureHex(hexKey);
+      } else {
+        setActionMsg(lang === 'ko' ? '이 타일은 압박할 수 없습니다.' : 'This hex cannot be pressured.');
+      }
+      return;
+    }
 
     // No action active — just select the hex for info
     if (!actionMode) {
@@ -133,8 +146,8 @@ export default function JuniorGameScreen() {
     { key: 'claim',    emoji: '🏴', icon: MapPin,        label: t.actions.claim,    ap: 1, mapAction: true },
     { key: 'build',    emoji: '🏗️', icon: Hammer,        label: t.actions.build,    ap: 1, mapAction: true },
     { key: 'research', emoji: '🔬', icon: FlaskConical,  label: t.actions.research, ap: 1, mapAction: false },
-    { key: 'dispute',  emoji: '⚖️', icon: AlertTriangle, label: lang === 'ko' ? '분쟁 해결' : 'Resolve Dispute', ap: 0, mapAction: false },
-    { key: 'help',     emoji: '🤝', icon: Heart,         label: t.actions.help,     ap: 0, mapAction: false },
+    { key: 'diplomacy', emoji: '🤝', icon: Heart, label: lang === 'ko' ? '외교' : 'Diplomacy', ap: 0, mapAction: false },
+    { key: 'help',     emoji: '🆘', icon: AlertTriangle,  label: t.actions.help,     ap: 0, mapAction: false },
   ];
 
   const scores = gameState.players.map(p => ({
@@ -194,10 +207,15 @@ export default function JuniorGameScreen() {
         {/* Resource strip */}
         <div className="ml-auto flex items-center gap-3">
           {/* Influence stars */}
-          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded"
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded" title={lang === 'ko'
+            ? `영향력: +1/3헥스, +1/자원 부족 없음, +1/협력`
+            : `Influence: +1 per 3 hexes, +1 no shortage, +1 cooperation`}
             style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)' }}>
             <span className="text-yellow-400 text-xs">⭐</span>
             <span className="font-mono font-bold text-xs text-yellow-400">{player.influenceStars || 0}</span>
+            <span className="text-[9px] text-yellow-600/70 ml-0.5">
+              +{calculateInfluenceAccrual(player, gameState, gameState.map)}
+            </span>
           </div>
           {RESOURCE_META.map(m => {
             const val = player.resources[m.key] || 0;
@@ -246,6 +264,11 @@ export default function JuniorGameScreen() {
             actionMode={actionMode}
             onHexHover={setHoveredHex}
             onHexLeave={() => setHoveredHex(null)}
+            pressureHighlightHexes={diplomacyPressureMode ? Object.keys(gameState.map.hexes).filter(k => {
+              const h = gameState.map.hexes[k];
+              return h.owner === diplomacyPressureTarget && canPressurizeHex(gameState, gameState.currentPlayerIndex, k);
+            }) : []}
+            selectedPressureHex={diplomacySelectedPressureHex}
           />
 
           {/* Save button */}
@@ -272,19 +295,28 @@ export default function JuniorGameScreen() {
         <div className="w-64 flex flex-col shrink-0 overflow-y-auto"
           style={{ background: 'rgba(8,12,25,0.97)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
 
-          {showDispute ? (
+          {showDiplomacy ? (
             <>
               <div className="flex items-center gap-2 px-3 py-2.5 shrink-0"
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                <button onClick={() => setShowDispute(false)}
+                <button onClick={() => { setShowDiplomacy(false); setDiplomacyPressureMode(false); setDiplomacyPressureTarget(null); setDiplomacySelectedPressureHex(null); }}
                   className="text-gray-500 hover:text-white transition-colors p-0.5">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
                 </button>
                 <h3 className="text-white font-heading font-bold text-xs">
-                  {lang === 'ko' ? '분쟁 해결' : 'Resolve Dispute'}
+                  {lang === 'ko' ? '외교' : 'Diplomacy'}
                 </h3>
               </div>
-              <JuniorDisputePanel onClose={() => setShowDispute(false)} />
+              <JuniorDiplomacyPanel
+                onClose={() => { setShowDiplomacy(false); setDiplomacyPressureMode(false); setDiplomacyPressureTarget(null); setDiplomacySelectedPressureHex(null); }}
+                onPressureHexSelect={(active, targetNation) => {
+                  setDiplomacyPressureMode(active);
+                  setDiplomacyPressureTarget(targetNation);
+                  setDiplomacySelectedPressureHex(null);
+                }}
+                highlightPressureHexes={diplomacyPressureMode}
+                selectedPressureHex={diplomacySelectedPressureHex}
+              />
             </>
           ) : (
             <>

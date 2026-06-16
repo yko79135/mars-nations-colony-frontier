@@ -54,7 +54,7 @@ function computeFitViewBox(hexes) {
   return { x: minX - padding, y: minY - padding, w: (maxX - minX) + padding * 2, h: (maxY - minY) + padding * 2 };
 }
 
-export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHover, onHexLeave }) {
+export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHover, onHexLeave, pressureHighlightHexes, selectedPressureHex }) {
   const { gameState, getViewBox, setViewBox, fitMapToScreen, resetMapView } = useGame();
   const containerRef = useRef(null);
 
@@ -306,7 +306,11 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
           let strokeColor = 'rgba(255,255,255,0.06)';
           let strokeWidth = 0.8;
           let glowFilter = null;
-          if (isSelected) { strokeColor = '#ffffff'; strokeWidth = 2.5; glowFilter = 'url(#glow-white)'; }
+          const isPressureHighlight = pressureHighlightHexes?.includes(key);
+          const isPressureSelected = selectedPressureHex === key;
+          if (isPressureSelected) { strokeColor = '#f87171'; strokeWidth = 3; glowFilter = 'url(#glow-white)'; }
+          else if (isPressureHighlight) { strokeColor = '#f87171'; strokeWidth = 2.2; }
+          else if (isSelected) { strokeColor = '#ffffff'; strokeWidth = 2.5; glowFilter = 'url(#glow-white)'; }
           else if (isValid && actionMode === 'explore') { strokeColor = '#60a5fa'; strokeWidth = 2; glowFilter = 'url(#glow-blue)'; }
           else if (isValid && actionMode === 'claim')   { strokeColor = '#4ade80'; strokeWidth = 2; glowFilter = 'url(#glow-green)'; }
           else if (isValid && actionMode === 'build')   { strokeColor = '#fbbf24'; strokeWidth = 2; glowFilter = 'url(#glow-gold)'; }
@@ -369,7 +373,13 @@ export default function HexMap({ onHexSelect, selectedHex, actionMode, onHexHove
                   return null;
                 })()}
 
-                {isValid && !isSelected && (
+                {isPressureHighlight && !isSelected && (
+                  <polygon points={points} fill="#f87171" opacity={0.12} stroke="none" />
+                )}
+                {isPressureSelected && (
+                  <polygon points={points} fill="#f87171" opacity={0.18} stroke="none" />
+                )}
+                {isValid && !isSelected && !isPressureHighlight && (
                   <polygon points={points}
                     fill={ACTION_GLOW[actionMode] || '#fff'}
                     opacity={0.10} stroke="none" />
