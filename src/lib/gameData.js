@@ -526,6 +526,120 @@ export function getEligibleHexesForTransfer(fromNationIndex, toNationIndex, map)
   return eligible;
 }
 
+// ============ PRESSURE / INFLUENCE SYSTEM ============
+
+export const PRESSURE_CONFIG = {
+  junior: {
+    baseCost: 2,
+    costPerBuilding: 1,
+    turnsToRespond: 3,
+    maxActivePerNation: 1,
+    maxInfluencePerRound: 3,
+    influencePer3Hexes: 1,
+    influenceNoShortage: 1,
+    influenceTechComplete: 1,
+    influenceHelpNation: 1,
+  },
+  senior: {
+    baseCost: 15,
+    costPerBuilding: 5,
+    turnsToRespond: 3,
+    maxActivePerNation: 2,
+    maxInfluencePerRound: 5,
+    influenceFromTradeHub: 2,
+    influenceFromCommsCenter: 2,
+    influenceFromGovernance: 3,
+    influenceFromDemocracy: 1,
+    influencePer5Hexes: 1,
+    influenceHighMorale: 1,
+    influencePerTradeAgreement: 1,
+  },
+};
+
+export function canPressurizeHex(gameState, nationIndex, hexKey) {
+  if (!gameState || !gameState.map) return false;
+  const hex = gameState.map.hexes[hexKey];
+  if (!hex) return false;
+  if (hex.owner === nationIndex) return false;
+  if (hex.isCapital) return false;
+  if (hex.owner === null || hex.owner === undefined) return false;
+
+  if (!isHexAdjacentToNation(hexKey, nationIndex, gameState.map)) return false;
+
+  const existingPressure = (gameState.pendingPressures || []).find(p =>
+    p.attackerIdx === nationIndex && p.hexKey === hexKey && p.status === 'active'
+  );
+  if (existingPressure) return false;
+
+  const isJunior = gameState.settings?.gradeMode === 'junior';
+  const maxActive = isJunior ? PRESSURE_CONFIG.junior.maxActivePerNation : PRESSURE_CONFIG.senior.maxActivePerNation;
+  const activeCount = (gameState.pendingPressures || []).filter(p =>
+    p.attackerIdx === nationIndex && p.status === 'active'
+  ).length;
+  if (activeCount >= maxActive) return false;
+
+  if (!isJunior) {
+    const hasAlliance = gameState.diplomacy?.agreements?.some(a =>
+      a.type === 'alliance' && a.status === 'active' &&
+      a.nationIds.includes(nationIndex) && a.nationIds.includes(hex.owner)
+    );
+    const hasPact = gameState.diplomacy?.agreements?.some(a =>
+      a.type === 'nonAggression' && a.status === 'active' &&
+      a.nationIds.includes(nationIndex) && a.nationIds.includes(hex.owner)
+    );
+    if (hasAlliance || hasPact) return false;
+  }
+
+  return true;
+}
+
+export function getPressureCost(hex, gameState) {
+  const isJunior = gameState?.settings?.gradeMode === 'junior';
+  const config = isJunior ? PRESSURE_CONFIG.junior : PRESSURE_CONFIG.senior;
+  const buildingCount = (hex.buildings || []).length;
+  return config.baseCost + buildingCount * config.costPerBuilding;
+}
+
+export function calculateInfluenceAccrual(player, gameState, map) {
+  if (!player || !gameState || !map) return 0;
+  const isJunior = gameState.settings?.gradeMode === 'junior';
+
+  if (isJunior) {
+    let gained = 0;
+    let territoryCount = 0;
+    Object.values(map.hexes).forEach(h => { if (h.owner === player.index) territoryCount++; });
+    gained += Math.floor(territoryCount / 3) * PRESSURE_CONFIG.junior.influencePer3Hexes;
+
+    const resources = player.resources || {};
+    const hasShortage = ['energy', 'water', 'food', 'minerals'].some(k => (resources[k] || 0) <= 2);
+    if (!hasShortage) gained += PRESSURE_CONFIG.junior.influenceNoShortage;
+
+    return Math.min(gained, PRESSURE_CONFIG.junior.maxInfluencePerRound);
+  }
+
+  let gained = 0;
+  let territoryCount = 0;
+  Object.values(map.hexes).forEach(h => { if (h.owner === player.index) territoryCount++; });
+  gained += Math.floor(territoryCount / 5) * PRESSURE_CONFIG.senior.influencePer5Hexes;
+
+  Object.values(map.hexes).forEach(h => {
+    if (h.owner !== player.index) return;
+    if (h.buildings.includes('tradeHub')) gained += PRESSURE_CONFIG.senior.influenceFromTradeHub;
+    if (h.buildings.includes('commsCenter')) gained += PRESSURE_CONFIG.senior.influenceFromCommsCenter;
+  });
+
+  if (player.technologies?.includes('governance')) gained += PRESSURE_CONFIG.senior.influenceFromGovernance;
+  if (player.technologies?.includes('democracy')) gained += PRESSURE_CONFIG.senior.influenceFromDemocracy;
+  if ((player.resources.morale || 50) > 70) gained += PRESSURE_CONFIG.senior.influenceHighMorale;
+
+  const tradeAgreementCount = (gameState.diplomacy?.agreements || []).filter(a =>
+    a.type === 'trade' && a.status === 'active' && a.nationIds.includes(player.index)
+  ).length;
+  gained += Math.floor(tradeAgreementCount / 2) * PRESSURE_CONFIG.senior.influencePerTradeAgreement;
+
+  return Math.min(gained, PRESSURE_CONFIG.senior.maxInfluencePerRound);
+}
+
 // ============ EVENTS ============
 
 export const EVENTS = [
@@ -841,6 +955,7 @@ export function createInitialGameState(settings, nations) {
     disputes: [],
     conflictCooldowns: {},
     marsCouncilVotes: [],
+    pendingPressures: [],
   };
 }
 
