@@ -20,16 +20,16 @@ const TERRAIN_ICONS = {
 
 // ────────────── DIPLOMACY ACTIONS ──────────────
 const DIPLO_ACTIONS = [
-  { key: 'trade',    icon: ArrowLeftRight, color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.3)',  text: '#93c5fd', en: 'Trade',              ko: '무역',           apCost: 0, descEn: 'Propose a resource exchange. The other nation can accept or reject on their turn.', descKo: '자원 교환을 제안합니다. 상대 국가가 턴에 수락 또는 거절할 수 있습니다.' },
-  { key: 'giveAid',  icon: Heart,          color: '#4ade80', bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.3)',  text: '#86efac', en: 'Give Aid',           ko: '지원하기',       apCost: 0, descEn: 'Send resources immediately. Gain Cooperation points.', descKo: '자원을 즉시 보냅니다. 협력 점수를 얻습니다.' },
-  { key: 'pressure', icon: Zap,            color: '#f87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.3)',  text: '#fca5a5', en: 'Pressure a Hex',     ko: '타일 압박',      apCost: 1, descEn: 'Spend Influence to pressure an adjacent enemy border hex.', descKo: '영향력을 소모하여 인접한 적국 변경 타일을 압박합니다.' },
-  { key: 'respond',  icon: Shield,         color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.3)',  text: '#fde68a', en: 'Respond to Pressure',ko: '압박 대응',      apCost: 0, descEn: 'Resist or surrender to incoming territorial pressure.', descKo: '들어오는 영토 압박에 저항하거나 포기합니다.' },
+  { key: 'trade',    icon: ArrowLeftRight, color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.3)',  text: '#93c5fd', en: 'Trade',              ko: '무역',           apCost: 1, descEn: 'Propose a resource exchange (1 AP). The other nation can accept or reject on their turn.', descKo: '자원 교환을 제안합니다 (1 AP). 상대 국가가 턴에 수락 또는 거절할 수 있습니다.' },
+  { key: 'giveAid',  icon: Heart,          color: '#4ade80', bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.3)',  text: '#86efac', en: 'Give Aid',           ko: '지원하기',       apCost: 1, descEn: 'Send resources immediately (1 AP). Gain Cooperation points.', descKo: '자원을 즉시 보냅니다 (1 AP). 협력 점수를 얻습니다.' },
+  { key: 'pressure', icon: Zap,            color: '#f87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.3)',  text: '#fca5a5', en: 'Pressure a Hex',     ko: '타일 압박',      apCost: 1, descEn: 'Spend Influence to pressure an adjacent enemy border hex (1 AP).', descKo: '영향력을 소모하여 인접한 적국 변경 타일을 압박합니다 (1 AP).' },
+  { key: 'respond',  icon: Shield,         color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.3)',  text: '#fde68a', en: 'Respond to Pressure',ko: '압박 대응',      apCost: 1, descEn: 'Resist or surrender to incoming territorial pressure (1 AP each).', descKo: '들어오는 영토 압박에 저항하거나 포기합니다 (각 1 AP).' },
   { key: 'status',   icon: ScrollText,     color: '#a78bfa', bg: 'rgba(167,139,250,0.1)',  border: 'rgba(167,139,250,0.3)',  text: '#c4b5fd', en: 'Diplomacy Status',   ko: '외교 현황',      apCost: 0, descEn: 'View trade proposals, pressures, and cooperation history.', descKo: '무역 제안, 압박 상태, 협력 기록을 확인합니다.' },
 ];
 
 export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, highlightPressureHexes, selectedPressureHex }) {
   const { t, lang } = useLang();
-  const { gameState, giveResource, pressurizeHex, resistPressure, surrenderPressure, proposeJuniorTrade, acceptProposal, rejectProposal } = useGame();
+  const { gameState, giveResource, pressurizeHex, resistPressure, surrenderPressure, proposeJuniorTrade, acceptJuniorTrade, rejectJuniorTrade } = useGame();
 
   const [flow, setFlow] = useState({ step: 'chooseAction', action: null, targetNationId: null, offerRes: {}, requestRes: {}, aidRes: 'minerals', aidAmt: '', pressureCost: null, resultMsg: null, reviewing: false });
 
@@ -59,9 +59,9 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
 
   const incomingPressures = (gameState.pendingPressures || []).filter(p => p.status === 'active' && p.defenderIdx === pidx);
   const outgoingPressures = (gameState.pendingPressures || []).filter(p => p.status === 'active' && p.attackerIdx === pidx);
-  const pendingTradeProposals = (gameState.diplomacy?.proposals || []).filter(p => p.status === 'pending' && p.type === 'trade');
-  const incomingTrades = pendingTradeProposals.filter(p => p.recipientIndex === pidx);
-  const outgoingTrades = pendingTradeProposals.filter(p => p.proposerIndex === pidx);
+  const pendingTradeProposals = (gameState.diplomacy?.proposals || []).filter(p => p.status === 'pending' && p.type === 'juniorTrade');
+  const incomingTrades = pendingTradeProposals.filter(p => Number(p.recipientIndex) === Number(pidx));
+  const outgoingTrades = pendingTradeProposals.filter(p => Number(p.proposerIndex) === Number(pidx));
 
   const setStep = (step, extra = {}) => setFlow(prev => ({ ...prev, step, ...extra, reviewing: false }));
   const resetAll = () => setFlow({ step: 'chooseAction', action: null, targetNationId: null, offerRes: {}, requestRes: {}, aidRes: 'minerals', aidAmt: '', pressureCost: null, resultMsg: null, reviewing: false });
@@ -151,26 +151,34 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
 
   // ── Respond to Pressure ──
   const handleResist = (pressureId, cost) => {
+    if (ap <= 0) {
+      setStep('result', { resultMsg: lang === 'ko' ? '행동력이 부족합니다.' : 'Not enough Action Points.' });
+      return;
+    }
     if (stars < cost) {
       setStep('result', { resultMsg: lang === 'ko' ? `영향력이 부족합니다! (필요: ⭐${cost})` : `Not enough Influence! (Need: ⭐${cost})` });
       return;
     }
     resistPressure(pressureId);
-    setStep('result', { resultMsg: lang === 'ko' ? '압박을 막았습니다! 영향력이 소모되었습니다.' : 'Pressure resisted! Influence was spent.' });
+    setStep('result', { resultMsg: lang === 'ko' ? '압박을 막았습니다! (1 AP 소모)' : 'Pressure resisted! (1 AP used)' });
   };
 
   const handleSurrender = (pressureId) => {
+    if (ap <= 0) {
+      setStep('result', { resultMsg: lang === 'ko' ? '행동력이 부족합니다.' : 'Not enough Action Points.' });
+      return;
+    }
     surrenderPressure(pressureId);
-    setStep('result', { resultMsg: lang === 'ko' ? '타일을 포기했습니다. 건물은 유지되지만 비활성화됩니다.' : 'Hex surrendered. Buildings remain but are inactive.' });
+    setStep('result', { resultMsg: lang === 'ko' ? '타일을 포기했습니다 (1 AP 소모).' : 'Hex surrendered (1 AP used).' });
   };
 
   // ── Trade response ──
   const handleAcceptTrade = (proposalId) => {
-    acceptProposal(proposalId);
+    acceptJuniorTrade(proposalId);
     setStep('result', { resultMsg: lang === 'ko' ? '무역 제안을 수락했습니다!' : 'Trade accepted! Resources exchanged.' });
   };
   const handleRejectTrade = (proposalId) => {
-    rejectProposal(proposalId);
+    rejectJuniorTrade(proposalId);
     setStep('result', { resultMsg: lang === 'ko' ? '무역 제안을 거절했습니다.' : 'Trade proposal rejected.' });
   };
 
@@ -336,6 +344,29 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
             </p>
           )}
 
+          {/* Capital protection note */}
+          {(() => {
+            const targetNation = gameState.players[flow.targetNationId];
+            if (!targetNation) return null;
+            const capitalKey = Object.entries(gameState.map.hexes).find(([k, h]) => h.isCapital && h.owner === flow.targetNationId)?.[0];
+            if (!capitalKey) return null;
+            return (
+              <div className="rounded-lg p-2 mt-2" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                <p className="text-[9px] text-yellow-400 flex items-center gap-1">
+                  <span>🛡️</span>
+                  <span>{lang === 'ko'
+                    ? `수도 식민지는 압박할 수 없습니다`
+                    : `Capital colonies cannot be pressured`}</span>
+                </p>
+                <p className="text-[8px] text-gray-500 mt-0.5">
+                  {lang === 'ko'
+                    ? `${targetNation.countryName}의 수도가 지도에 별표로 표시됩니다`
+                    : `${targetNation.countryName}'s capital is marked with ★ on the map`}
+                </p>
+              </div>
+            );
+          })()}
+
           <p className="text-[9px] text-gray-600 text-center mt-2">
             {lang === 'ko'
               ? `가능한 타일: ${eligibleHexes.length}개 | 영향력: ⭐${stars}`
@@ -350,6 +381,18 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
   if (flow.step === 'chooseAction') {
     return (
       <div className="flex flex-col flex-1">
+        {/* Quick incoming trade notification */}
+        {incomingTrades.length > 0 && (
+          <div className="mx-2 mt-2 px-2 py-1.5 rounded-lg"
+            style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)' }}>
+            <p className="text-[10px] text-blue-400 font-bold">
+              📨 {lang === 'ko'
+                ? `받은 무역 제안 ${incomingTrades.length}건!`
+                : `${incomingTrades.length} incoming trade proposal(s)!`}
+            </p>
+          </div>
+        )}
+
         {/* Quick incoming pressure warning */}
         {incomingPressures.length > 0 && (
           <div className="mx-2 mt-2 px-2 py-1.5 rounded-lg"
@@ -459,14 +502,14 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
                     {attacker?.countryName} → {t.terrain[hex?.terrain]}
                     <span className="text-gray-600 ml-1">⭐{p.cost} · {p.defenderTurnsRemaining}t</span>
                   </div>
-                  <button onClick={() => handleResist(p.id, p.cost)} disabled={stars < p.cost}
+                  <button onClick={() => handleResist(p.id, p.cost)} disabled={stars < p.cost || ap <= 0}
                     className="px-1.5 py-0.5 rounded text-[9px] font-bold disabled:opacity-30"
                     style={{ background: 'rgba(74,222,128,0.15)', color: '#86efac' }}>
-                    {lang === 'ko' ? '저항' : 'Resist'}
+                    {lang === 'ko' ? '저항 (1 AP)' : 'Resist (1 AP)'}
                   </button>
-                  <button onClick={() => handleSurrender(p.id)}
-                    className="px-1.5 py-0.5 rounded text-[9px]" style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5' }}>
-                    {lang === 'ko' ? '포기' : 'Give'}
+                  <button onClick={() => handleSurrender(p.id)} disabled={ap <= 0}
+                    className="px-1.5 py-0.5 rounded text-[9px] disabled:opacity-30" style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5' }}>
+                    {lang === 'ko' ? '포기 (1 AP)' : 'Give (1 AP)'}
                   </button>
                 </div>
               );
@@ -536,15 +579,15 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
                       <div className="flex-1 text-[10px] text-gray-300">
                         {t.terrain[hex?.terrain]} <span className="text-gray-600">⭐{p.cost} · {p.defenderTurnsRemaining}t</span>
                       </div>
-                      <button onClick={() => handleResist(p.id, p.cost)} disabled={stars < p.cost}
+                      <button onClick={() => handleResist(p.id, p.cost)} disabled={stars < p.cost || ap <= 0}
                         className="px-2 py-1 rounded text-[9px] font-bold disabled:opacity-30"
                         style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.25)', color: '#86efac' }}>
-                        {lang === 'ko' ? '저항' : 'Resist'}
+                        {lang === 'ko' ? '저항 (1 AP)' : 'Resist (1 AP)'}
                       </button>
-                      <button onClick={() => handleSurrender(p.id)}
-                        className="px-2 py-1 rounded text-[9px] font-bold"
+                      <button onClick={() => handleSurrender(p.id)} disabled={ap <= 0}
+                        className="px-2 py-1 rounded text-[9px] font-bold disabled:opacity-30"
                         style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5' }}>
-                        {lang === 'ko' ? '포기' : 'Surrender'}
+                        {lang === 'ko' ? '포기 (1 AP)' : 'Surrender (1 AP)'}
                       </button>
                     </div>
                   );
@@ -672,12 +715,12 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
             </p>
           </div>
 
-          <button onClick={handleGiveAid} disabled={!valid}
+          <button onClick={handleGiveAid} disabled={!valid || ap <= 0}
             className="w-full py-2.5 rounded-xl text-sm font-heading font-bold transition-all disabled:opacity-30"
             style={{ background: 'rgba(74,222,128,0.25)', border: '1px solid rgba(74,222,128,0.4)', color: '#86efac' }}>
             {lang === 'ko'
-              ? `${RES_META.find(r => r.key === flow.aidRes)?.ko} ${amt || ''} 전송`
-              : `Send ${amt || ''} ${RES_META.find(r => r.key === flow.aidRes)?.en || ''}`}
+              ? `${RES_META.find(r => r.key === flow.aidRes)?.ko} ${amt || ''} 전송 (1 AP)`
+              : `Send ${amt || ''} ${RES_META.find(r => r.key === flow.aidRes)?.en || ''} (1 AP)`}
           </button>
         </div>
       );
@@ -750,10 +793,10 @@ export default function JuniorDiplomacyPanel({ onClose, onPressureHexSelect, hig
             })}
           </div>
 
-          <button onClick={handleSendTrade} disabled={!canSend}
+          <button onClick={handleSendTrade} disabled={!canSend || ap <= 0}
             className="w-full py-2.5 rounded-xl text-sm font-heading font-bold transition-all disabled:opacity-30"
             style={{ background: 'rgba(96,165,250,0.25)', border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd' }}>
-            {lang === 'ko' ? '무역 제안 보내기' : 'Send Trade Proposal'}
+            {lang === 'ko' ? '무역 제안 보내기 (1 AP)' : 'Send Trade Proposal (1 AP)'}
           </button>
         </div>
       );

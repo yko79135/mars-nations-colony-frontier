@@ -229,15 +229,21 @@ export function GameProvider({ children }) {
 
   const proposeJuniorTrade = useCallback((recipientIndex, offeredResources, requestedResources) => {
     setGameState(prev => {
-      if (!prev) return prev;
+      if (!prev || prev.actionPoints <= 0) return prev;
       const pidx = prev.currentPlayerIndex;
       if (recipientIndex === pidx) return prev;
+
+      // Validate offered resources
+      for (const [res, amt] of Object.entries(offeredResources || {})) {
+        if ((prev.players[pidx].resources[res] || 0) < amt) return prev;
+      }
+
       const next = JSON.parse(JSON.stringify(prev));
       if (!next.diplomacy) next.diplomacy = { proposals: [], agreements: [], history: [], trust: {} };
 
       const proposal = {
         id: `trade_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        type: 'trade',
+        type: 'juniorTrade',
         proposerIndex: pidx,
         recipientIndex,
         status: 'pending',
@@ -247,6 +253,74 @@ export function GameProvider({ children }) {
       };
 
       next.diplomacy.proposals.push(proposal);
+      next.actionPoints -= 1;
+      return next;
+    });
+  }, []);
+
+  // ---- JUNIOR TRADE RESOLUTION ----
+
+  const acceptJuniorTrade = useCallback((proposalId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) return prev;
+      const propIdx = next.diplomacy.proposals.findIndex(p => p.id === proposalId);
+      if (propIdx === -1) return prev;
+      const proposal = next.diplomacy.proposals[propIdx];
+      if (proposal.status !== 'pending') return prev;
+      if (proposal.type !== 'juniorTrade') return prev;
+      const pidx = next.currentPlayerIndex;
+      if (proposal.recipientIndex !== pidx) return prev;
+
+      const proposer = next.players[proposal.proposerIndex];
+      const recipient = next.players[pidx];
+      const offered = proposal.offeredResources || {};
+      const requested = proposal.requestedResources || {};
+
+      // Validate that both still own the promised resources
+      for (const [res, amt] of Object.entries(offered)) {
+        if ((proposer.resources[res] || 0) < amt) return prev;
+      }
+      for (const [res, amt] of Object.entries(requested)) {
+        if ((recipient.resources[res] || 0) < amt) return prev;
+      }
+
+      // Transfer resources
+      for (const [res, amt] of Object.entries(offered)) {
+        proposer.resources[res] -= amt;
+        recipient.resources[res] = (recipient.resources[res] || 0) + amt;
+      }
+      for (const [res, amt] of Object.entries(requested)) {
+        recipient.resources[res] -= amt;
+        proposer.resources[res] = (proposer.resources[res] || 0) + amt;
+      }
+
+      proposal.status = 'accepted';
+      adjustTrust(next, proposal.proposerIndex, pidx, 5);
+      proposer.scores.cooperation = (proposer.scores.cooperation || 0) + 3;
+      recipient.scores.cooperation = (recipient.scores.cooperation || 0) + 3;
+      next.diplomacy.history.push({ ...proposal, resolvedRound: next.currentRound });
+      next.diplomacy.proposals.splice(propIdx, 1);
+      return next;
+    });
+  }, []);
+
+  const rejectJuniorTrade = useCallback((proposalId) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      if (!next.diplomacy) return prev;
+      const propIdx = next.diplomacy.proposals.findIndex(p => p.id === proposalId);
+      if (propIdx === -1) return prev;
+      const proposal = next.diplomacy.proposals[propIdx];
+      if (proposal.status !== 'pending') return prev;
+      if (proposal.type !== 'juniorTrade') return prev;
+      if (proposal.recipientIndex !== next.currentPlayerIndex) return prev;
+
+      proposal.status = 'rejected';
+      next.diplomacy.history.push({ ...proposal, resolvedRound: next.currentRound });
+      next.diplomacy.proposals.splice(propIdx, 1);
       return next;
     });
   }, []);
@@ -255,16 +329,18 @@ export function GameProvider({ children }) {
 
   const giveResource = useCallback((toPlayerIndex, resource, amount) => {
     setGameState(prev => {
-      if (!prev) return prev;
+      if (!prev || prev.actionPoints <= 0) return prev;
       const next = JSON.parse(JSON.stringify(prev));
       const fromPlayer = next.players[next.currentPlayerIndex];
       const toPlayer = next.players[toPlayerIndex];
       if (!toPlayer) return prev;
+      if (amount <= 0) return prev;
       if ((fromPlayer.resources[resource] || 0) < amount) return prev;
       fromPlayer.resources[resource] -= amount;
       toPlayer.resources[resource] = (toPlayer.resources[resource] || 0) + amount;
       fromPlayer.cooperationActions = (fromPlayer.cooperationActions || 0) + 1;
       fromPlayer.scores.cooperation = (fromPlayer.scores.cooperation || 0) + 5;
+      next.actionPoints -= 1;
       return next;
     });
   }, []);
@@ -662,7 +738,7 @@ export function GameProvider({ children }) {
 
   const resistPressure = useCallback((pressureId) => {
     setGameState(prev => {
-      if (!prev) return prev;
+      if (!prev || prev.actionPoints <= 0) return prev;
       const next = JSON.parse(JSON.stringify(prev));
       const idx = (next.pendingPressures || []).findIndex(p => p.id === pressureId);
       if (idx === -1) return prev;
@@ -677,13 +753,14 @@ export function GameProvider({ children }) {
       player[influenceKey] -= p.cost;
       next.pendingPressures[idx].status = 'resisted';
       next.pendingPressures[idx].resolvedRound = next.currentRound;
+      next.actionPoints -= 1;
       return next;
     });
   }, []);
 
   const surrenderPressure = useCallback((pressureId) => {
     setGameState(prev => {
-      if (!prev) return prev;
+      if (!prev || prev.actionPoints <= 0) return prev;
       const next = JSON.parse(JSON.stringify(prev));
       const idx = (next.pendingPressures || []).findIndex(p => p.id === pressureId);
       if (idx === -1) return prev;
@@ -705,6 +782,7 @@ export function GameProvider({ children }) {
         toNationIndex: p.attackerIdx,
         round: next.currentRound,
       });
+      next.actionPoints -= 1;
       return next;
     });
   }, []);
@@ -1022,7 +1100,7 @@ export function GameProvider({ children }) {
       proposeAgreement, acceptProposal, rejectProposal, withdrawProposal, cancelAgreement,
       transferHex, adjustDiplomaticInfluence, adjustJuniorInfluenceStars, juniorLandExchange, createDispute, resolveDispute,
       requestMarsCouncil, castCouncilVote, getCooldown, proposeTerritorialRequest,
-      pressurizeHex, resistPressure, surrenderPressure, proposeJuniorTrade,
+      pressurizeHex, resistPressure, surrenderPressure, proposeJuniorTrade, acceptJuniorTrade, rejectJuniorTrade,
       endTurn, dismissEvent,
       saveGame, loadGame, getSavedGames, deleteSave,
       // Camera API — stable, never touched by game actions
